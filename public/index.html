@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pokémon hlídač</title>
+  <meta name="description" content="Novinky, předprodeje, sklad a ceny Pokémon TCG v českých obchodech.">
+  <meta name="theme-color" content="#07080b">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23f3f3f3' stroke='%230a0a0a' stroke-width='3'/><path d='M2 16a14 14 0 0 1 28 0z' fill='%23e8483a' stroke='%230a0a0a' stroke-width='3'/><circle cx='16' cy='16' r='4.5' fill='%23fff' stroke='%230a0a0a' stroke-width='3'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Přeskočit na obsah</a>
+
+  <!-- Přihlášení -->
+  <main id="login" class="login" hidden>
+    <form id="login-form" class="login-card">
+      <div class="brand brand-lg"><span class="ball" aria-hidden="true"></span> Pokémon hlídač</div>
+      <p class="muted">Novinky, předprodeje a sklad Pokémon TCG v českých obchodech.</p>
+      <label class="field">
+        <span>Heslo</span>
+        <input type="password" name="password" autocomplete="current-password" required autofocus>
+      </label>
+      <button class="btn btn-primary" type="submit">Přihlásit</button>
+      <p id="login-error" class="error" role="alert" hidden></p>
+    </form>
+  </main>
+
+  <!-- Aplikace -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand"><span class="ball" aria-hidden="true"></span> Pokémon hlídač</div>
+      <nav class="tabs" id="tabs" aria-label="Sekce">
+        <button data-view="overview" class="active">Přehled</button>
+        <button data-view="watch">Hlídám</button>
+        <button data-view="market">Trh CZ</button>
+        <button data-view="calendar">Kalendář</button>
+        <button data-view="news">Novinky</button>
+        <button data-view="settings">Nastavení</button>
+      </nav>
+      <button class="btn btn-ghost btn-sm" id="refresh" aria-label="Načíst znovu" title="Načíst znovu">↻</button>
+    </header>
+
+    <main class="content" id="main">
+      <!-- PŘEHLED -->
+      <section data-view="overview">
+        <div class="ov-hero">
+          <h1>Dnes na českém trhu</h1>
+          <p class="muted" id="ov-sub">Načítám…</p>
+        </div>
+        <div class="stats" id="stats">
+          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+        </div>
+
+        <div class="ov-grid">
+          <article class="panel ov-news">
+            <div class="panel-head"><h2>Novinky</h2><button class="link-more" data-go="news">Všechny novinky →</button></div>
+            <div id="ov-news" class="ov-news-grid"></div>
+          </article>
+
+          <article class="panel ov-upcoming">
+            <div class="panel-head"><h2>Chystá se</h2><button class="link-more" data-go="calendar">Kalendář →</button></div>
+            <h3 class="sub">Nejbližší vydání</h3>
+            <ul class="mini-list" id="upcoming"></ul>
+            <h3 class="sub">V předprodeji</h3>
+            <ul class="mini-list" id="preorders"></ul>
+            <h3 class="sub">Ohlášené sety a produkty</h3>
+            <ul class="mini-list" id="announced"></ul>
+          </article>
+
+          <article class="panel ov-hot">
+            <div class="panel-head"><h2>Co letí</h2><button class="link-more" data-go="market">Trh CZ →</button></div>
+            <p class="panel-note">Produkty, které mizí z obchodů: vyprodané ve většině obchodů nebo vyprodané v posledních dnech.</p>
+            <ul class="hot-list" id="hot"></ul>
+          </article>
+
+          <article class="panel ov-selling">
+            <div class="panel-head"><h2>Právě v prodeji</h2><button class="link-more" data-go="market">Trh CZ →</button></div>
+            <p class="panel-note">Nově přidané a znovu naskladněné produkty, u každého nejlevnější obchod.</p>
+            <ul class="sell-list" id="selling"></ul>
+          </article>
+
+          <article class="panel ov-feed">
+            <div class="panel-head">
+              <h2>Co se stalo</h2>
+              <select id="feed-filter" class="select-sm" aria-label="Filtr událostí">
+                <option value="">Vše</option>
+                <option value="new_product">Nové produkty</option>
+                <option value="restock">Zpět skladem</option>
+                <option value="preorder">Předprodeje</option>
+                <option value="sold_out">Vyprodáno</option>
+                <option value="price_drop">Zlevnění</option>
+                <option value="news">Novinky</option>
+              </select>
+            </div>
+            <ul class="feed" id="feed">
+              <li><div class="sk thumb"></div><div><div class="sk sk-line" style="width:40%"></div><div class="sk sk-line"></div></div><span></span></li>
+              <li><div class="sk thumb"></div><div><div class="sk sk-line" style="width:30%"></div><div class="sk sk-line"></div></div><span></span></li>
+              <li><div class="sk thumb"></div><div><div class="sk sk-line" style="width:45%"></div><div class="sk sk-line"></div></div><span></span></li>
+            </ul>
+          </article>
+
+          <article class="panel ov-watch">
+            <div class="panel-head"><h2>Tvoje hlídané</h2><button class="link-more" data-go="watch">Hlídám →</button></div>
+            <ul class="mini-list" id="ov-watch"></ul>
+          </article>
+        </div>
+      </section>
+
+      <!-- HLÍDÁM -->
+      <section data-view="watch" hidden>
+        <form id="watch-form" class="panel add-form">
+          <label class="field grow">
+            <span>URL produktu z českého e-shopu</span>
+            <input name="url" type="url" placeholder="https://www.tlamagames.com/deskove-hry/pokemon-tcg--…" required>
+          </label>
+          <label class="field w-sm">
+            <span>Cílová cena (Kč)</span>
+            <input name="targetPrice" type="number" min="1" step="1" placeholder="nepovinné">
+          </label>
+          <button class="btn btn-primary" type="submit">Hlídat</button>
+        </form>
+        <p class="hint">Upozorním, když se produkt vrátí na sklad, spustí se předprodej, nebo zlevní (s cílovou cenou až když klesne pod ni). Kontrola každých 10 minut.</p>
+        <div class="cards" id="watch-list"></div>
+      </section>
+
+      <!-- TRH CZ -->
+      <section data-view="market" hidden>
+        <div class="panel filters">
+          <input id="m-search" type="search" placeholder="Hledat napříč obchody, třeba „pitch black etb“" aria-label="Hledat produkt">
+          <select id="m-avail" aria-label="Dostupnost">
+            <option value="">Jakákoli dostupnost</option>
+            <option value="buy">Skladem + předprodej</option>
+            <option value="in_stock">Jen skladem</option>
+            <option value="preorder">Jen předprodej</option>
+            <option value="out_of_stock">Jen vyprodané</option>
+          </select>
+          <select id="m-shop" aria-label="Obchod"><option value="">Všechny obchody</option></select>
+          <select id="m-sort" aria-label="Řazení">
+            <option value="new">Nejnověji přidané</option>
+            <option value="price">Nejlevnější</option>
+            <option value="name">Podle názvu</option>
+          </select>
+        </div>
+        <p class="hint" id="m-count"></p>
+        <div class="table-wrap">
+          <table class="table" id="market-table">
+            <thead><tr><th></th><th>Produkt</th><th>Obchod</th><th class="num">Cena</th><th>Dostupnost</th><th class="hide-sm">Ověřeno</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- KALENDÁŘ -->
+      <section data-view="calendar" hidden>
+        <div class="grid-2 calendar-grid">
+          <div class="panel">
+            <div class="panel-head"><h2>Vydání a předprodeje</h2></div>
+            <div id="calendar"></div>
+          </div>
+          <form id="release-form" class="panel">
+            <h2>Přidat termín ručně</h2>
+            <p class="hint">Třeba oficiálně ohlášený set, který ještě žádný obchod nemá.</p>
+            <label class="field"><span>Název</span><input name="name" required placeholder="Mega Evolution: Delta Reign"></label>
+            <div class="row">
+              <label class="field grow"><span>Datum</span><input name="date" type="date" required></label>
+              <label class="field"><span>Region</span>
+                <select name="region"><option>EN</option><option>CZ</option><option>JP</option></select>
+              </label>
+            </div>
+            <label class="field"><span>Odkaz (nepovinné)</span><input name="url" type="url" placeholder="https://www.pokeguardian.com/…"></label>
+            <label class="field"><span>Poznámka</span><input name="note" placeholder="předprodej od 1. 11., ETB a booster box"></label>
+            <button class="btn btn-primary" type="submit">Přidat termín</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- NOVINKY -->
+      <section data-view="news" hidden>
+        <div class="panel filters">
+          <label class="check"><input type="checkbox" id="n-announce"> Jen ohlášení produktů a setů</label>
+          <label class="check"><input type="checkbox" id="n-cz"> Jen české zprávy</label>
+          <span class="muted" id="n-meta"></span>
+        </div>
+        <div class="news-grid" id="news"></div>
+      </section>
+
+      <!-- NASTAVENÍ -->
+      <section data-view="settings" hidden>
+        <div class="grid-2">
+          <div class="panel">
+            <h2>Notifikace</h2>
+            <div id="channels" class="channels"></div>
+            <button class="btn" id="test-notify">Poslat testovací zprávu</button>
+            <form id="settings-form" class="stack mt">
+              <label class="check"><input type="checkbox" name="notifyRestock"> Zpět skladem a spuštěný předprodej (hlídané)</label>
+              <label class="check"><input type="checkbox" name="notifyPriceDrop"> Zlevnění (hlídané)</label>
+              <label class="check"><input type="checkbox" name="notifyNewProducts"> Nový produkt v obchodě</label>
+              <label class="field"><span>Nové produkty hlásit, jen když název obsahuje (oddělené čárkou, prázdné = vše)</span>
+                <input name="keywords" placeholder="booster box, elite trainer, etb, bundle"></label>
+              <label class="field"><span>Novinky (PokeGuardian, Google News EN a CZ)</span>
+                <select name="newsNotify">
+                  <option value="announce">Jen ohlášení produktů a setů</option>
+                  <option value="all">Všechny články</option>
+                  <option value="off">Neposílat</option>
+                </select>
+              </label>
+              <button class="btn btn-primary" type="submit">Uložit</button>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Obchody</h2>
+              <div class="row">
+                <button class="btn btn-sm" id="run-scan">Skenovat teď</button>
+                <button class="btn btn-sm" id="run-stock">Zkontrolovat hlídané</button>
+              </div>
+            </div>
+            <p class="hint" id="runs"></p>
+            <div class="table-wrap">
+              <table class="table compact" id="shops-table">
+                <thead><tr><th>Obchod</th><th>Režim</th><th class="num">Produktů</th><th>Poslední sken</th><th>Skenovat</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="hint">Obchody v režimu „jen hlídání“ mají výpis kategorií generovaný JavaScriptem. Konkrétní produkt z nich hlídat jde, stačí vložit URL do „Hlídám“. Alza a Smarty automatický přístup blokují.</p>
+            <button class="btn btn-ghost btn-sm" id="logout">Odhlásit</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

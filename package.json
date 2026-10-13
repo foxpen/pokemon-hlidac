@@ -1,0 +1,12 @@
+{
+  "name": "pokemon-hlidac",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx netlify-cli dev",
+    "test:parse": "node scripts/test-scan.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
