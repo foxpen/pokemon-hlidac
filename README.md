@@ -16,22 +16,7 @@ Stack: statický web (`public/`) + Netlify Functions (Node, ESM) + Netlify Blobs
 | **Novinky** | PokeGuardian (ohlášení produktů a setů), Google News EN „Pokémon TCG“, Google News CZ „pokémon karty“ |
 | **Nastavení** | Stav notifikací + testovací zpráva, filtry notifikací, stav obchodů, ruční sken |
 
-## Obchody
 
-| Obchod | Sken nových produktů | Hlídání URL | Jak |
-|---|---|---|---|
-| Černý rytíř | ✅ | ✅ | jejich veřejné API (web je JS aplikace); sklad e-shop + prodejna, předprodej, datum vydání |
-| Veselý drak | ✅ (vč. předprodeje) | ✅ | HTML (vlastní parser, nemají schema.org) |
-| Sparkys | ✅ | ✅ | HTML + dataLayer |
-| Tlama Games | ✅ (vč. předprodeje) | ✅ | Shoptet, schema.org |
-| Imago | ✅ | ✅ | schema.org |
-| Xzone | ✅ | ✅ | schema.org |
-| Svět her | ✅ | ✅ | schema.org |
-| Planeta her | ✅ (vč. předprodeje) | ✅ | Shoptet, schema.org |
-| TCGshop | ✅ | ✅ | Shoptet, schema.org |
-| Najáda, Dráčik | ❌ (výpis renderuje JS) | ✅* | schema.org na detailu |
-| Jiný CZ e-shop | ❌ | ✅* | obecný parser (JSON-LD / microdata / og meta) |
-| **Alza, Smarty** | ❌ | ❌ | aktivně blokují automatický přístup (TLS otisk) — neobcházíme |
 
 \* funguje, pokud stránka produktu má strukturovaná data (většina CZ e-shopů). Když ne, karta v „Hlídám“ to napíše.
 
