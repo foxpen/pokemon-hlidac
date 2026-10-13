@@ -9,6 +9,7 @@ const ICON = {
   preorder: '📝',
   price_drop: '💸',
   news: '📰',
+  announced: '📣',
   test: '🔔',
 };
 
@@ -18,6 +19,7 @@ const LABEL = {
   preorder: 'Předprodej spuštěn',
   price_drop: 'Zlevnění',
   news: 'Novinka',
+  announced: 'Ohlášeno',
   test: 'Test',
 };
 
@@ -63,7 +65,7 @@ async function discord(ev) {
         url: ev.url || undefined,
         description: lines(ev) || undefined,
         thumbnail: ev.image ? { url: ev.image } : undefined,
-        color: { new_product: 0xffcb05, restock: 0x3fb950, preorder: 0x58a6ff, price_drop: 0xf0883e, news: 0xa371f7 }[ev.type],
+        color: { new_product: 0xffcb05, restock: 0x3fb950, preorder: 0x58a6ff, price_drop: 0xf0883e, news: 0xa371f7, announced: 0xb386ee }[ev.type],
       }],
     }),
   });

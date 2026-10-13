@@ -78,6 +78,7 @@ export const SHOPS = [
   // obcházet to nechceme, takže je jen ukazujeme jako nepodporované.
   { id: 'alza', name: 'Alza', host: 'alza.cz', blocked: true },
   { id: 'smarty', name: 'Smarty', host: 'smarty.cz', blocked: true },
+  { id: 'allegro', name: 'Allegro', host: 'allegro.cz', blocked: true },
   { id: 'najada', name: 'Najáda', host: 'najada.games' },
   { id: 'dracik', name: 'Dráčik', host: 'dracik.cz' },
 ];

@@ -3,9 +3,10 @@ import { endpoint, json } from './_lib/http-response.js';
 import { getJson, listJson, getSettings } from './_lib/store.js';
 import { SHOPS } from './_lib/shops.js';
 import { configured } from './_lib/notify.js';
+import { getOfficial } from './_lib/official.js';
 
 export default endpoint(async () => {
-  const [watch, settings, feedStock, feedScan, news, releases, runStock, runScan, ...shopStates] = await Promise.all([
+  const [watch, settings, feedStock, feedScan, news, releases, runStock, runScan, official, ...shopStates] = await Promise.all([
     listJson('watch/'),
     getSettings(),
     getJson('feed/stock', []),
@@ -14,6 +15,7 @@ export default endpoint(async () => {
     getJson('releases', []),
     getJson('run/stock'),
     getJson('run/scan'),
+    getOfficial(),
     ...SHOPS.map((s) => getJson(`shop/${s.id}`)),
   ]);
 
@@ -51,6 +53,7 @@ export default endpoint(async () => {
     news: news.items.slice(0, 80),
     newsLastScan: news.lastScan || null,
     releases,
+    official,
     settings,
     channels: configured(),
     runs: { stock: runStock, scan: runScan },

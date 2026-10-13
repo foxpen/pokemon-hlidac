@@ -286,6 +286,7 @@ input::placeholder { color: var(--faint); }
 .t-new_product { --energy: var(--lightning); }
 .t-news { --energy: var(--psychic); }
 .t-sold_out { --energy: var(--danger); }
+.t-announced { --energy: var(--psychic); }
 .b-out_of_stock { --energy: var(--colorless); }
 .b-unknown { --energy: var(--faint); }
 

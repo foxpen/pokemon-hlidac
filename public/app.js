@@ -4,7 +4,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
 const AVAIL = { in_stock: 'Skladem', preorder: 'Předprodej', out_of_stock: 'Nedostupné', unknown: 'Neznámo' };
-const EV = { new_product: 'Nový produkt', restock: 'Zpět skladem', preorder: 'Předprodej', price_drop: 'Zlevnění', sold_out: 'Vyprodáno', news: 'Novinka' };
+const EV = { new_product: 'Nový produkt', restock: 'Zpět skladem', preorder: 'Předprodej', price_drop: 'Zlevnění', sold_out: 'Vyprodáno', news: 'Novinka', announced: 'Ohlášeno' };
 const BUYABLE = new Set(['in_stock', 'preorder']);
 const DAY = 86400e3;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -169,7 +169,9 @@ function upcomingItems() {
   const auto = S.catalog.filter((c) => c.releaseDate && c.releaseDate >= from)
     .map((c) => ({ date: c.releaseDate, name: c.name, url: c.url, meta: `${c.shop} · ${price(c.price)}`, availability: c.availability }));
   const manual = S.releases.map((r) => ({ id: r.id, date: r.date, name: r.name, url: r.url, meta: [r.region, r.note].filter(Boolean).join(' · '), manual: true }));
-  return [...auto, ...manual].filter((x) => x.date >= from).sort((a, b) => a.date.localeCompare(b.date));
+  // oficiální termíny z pokemon.com (EN vydání, v EU obvykle stejný den)
+  const official = (S.official || []).map((o) => ({ date: o.date, name: o.name, url: o.url, image: o.image, meta: 'oficiálně · pokemon.com', official: true }));
+  return [...official, ...auto, ...manual].filter((x) => x.date >= from).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 const seenFeed = new Set();

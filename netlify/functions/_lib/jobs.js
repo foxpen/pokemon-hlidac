@@ -5,6 +5,7 @@ import { fetchText, pool } from './http.js';
 import { parseProduct } from './product.js';
 import { SHOPS, shopForUrl, extractProductLinks, scanCernyRytir, fetchCernyRytir } from './shops.js';
 import { fetchAllNews } from './news.js';
+import { scanOfficial } from './official.js';
 import { getJson, setJson, listJson, pushFeed, getSettings } from './store.js';
 import { notify } from './notify.js';
 
@@ -232,6 +233,12 @@ export async function runScan({ deadline, only } = {}) {
   if (!only) {
     try { events.push(...(await scanNews(settings))); status.news = { ok: true }; }
     catch (e) { status.news = { ok: false, error: e.message }; }
+    try {
+      const ann = await scanOfficial({ deadline });
+      // oficiální ohlášení se hlásí jako novinka, pokud novinky nejsou vypnuté
+      events.push(...ann.map((e) => (settings.newsNotify === 'off' ? { ...e, silent: true } : e)));
+      status.official = { ok: true };
+    } catch (e) { status.official = { ok: false, error: e.message }; }
   }
   // do přehledu jde všechno, filtr (klíčová slova, vypnuté typy) se týká jen notifikací
   const stamped = events.map((e) => ({ id: evId(), time: nowIso(), ...e }));
