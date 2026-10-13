@@ -1,13 +1,13 @@
 // POST {action: add|remove|update, ...} — správa hlídaných produktů.
 import { createHash } from 'node:crypto';
-import { authed, json } from './_lib/auth.js';
+import { endpoint, json } from './_lib/http-response.js';
 import { getJson, setJson, del, getSettings } from './_lib/store.js';
 import { shopForUrl } from './_lib/shops.js';
 import { checkWatchItem } from './_lib/jobs.js';
 
 const idFor = (url) => createHash('sha1').update(url).digest('hex').slice(0, 16);
 
-export default authed(async (req) => {
+export default endpoint(async (req) => {
   const body = await req.json().catch(() => ({}));
   const { action } = body;
 

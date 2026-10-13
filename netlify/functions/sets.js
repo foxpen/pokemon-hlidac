@@ -1,8 +1,8 @@
 // GET — souhrn edic (bez ?id) nebo detail jedné edice (?id=<pokedata set id>).
-import { authed, json } from './_lib/auth.js';
+import { endpoint, json } from './_lib/http-response.js';
 import { getJson } from './_lib/store.js';
 
-export default authed(async (req) => {
+export default endpoint(async (req) => {
   const id = new URL(req.url).searchParams.get('id');
   if (id) {
     const d = await getJson(`set/${Number(id)}`);

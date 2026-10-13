@@ -50,7 +50,6 @@ async function api(name, body) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && name !== 'login') { showLogin(); throw new Error('Přihlášení vypršelo'); }
   if (!res.ok) throw new Error(data.error || `Server odpověděl chybou ${res.status}`);
   return data;
 }
@@ -127,22 +126,6 @@ function groupCatalog(items) {
   }
   return groups;
 }
-
-// ---------- login ----------
-function showLogin() { $('#app').hidden = true; $('#login').hidden = false; }
-
-$('#login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const err = $('#login-error');
-  err.hidden = true;
-  try {
-    await api('login', { password: e.target.password.value });
-    e.target.reset();
-    start();
-  } catch (x) { err.textContent = x.message; err.hidden = false; }
-});
-
-$('#logout').addEventListener('click', async () => { await api('logout', {}); showLogin(); });
 
 // ---------- views ----------
 const shownViews = new Set();
@@ -854,10 +837,6 @@ $('#refresh').addEventListener('click', (e) => busy(e.target, load));
 
 // ---------- start ----------
 async function start() {
-  const { authed } = await api('me');
-  if (!authed) return showLogin();
-  $('#login').hidden = true;
-  $('#app').hidden = false;
   let v = 'overview';
   try { v = localStorage.getItem('ph_view') || v; } catch {}
   try { await load(); } catch (e) { toast(e.message, true); }
@@ -865,4 +844,4 @@ async function start() {
 }
 
 start();
-setInterval(() => { if (!document.hidden && !$('#app').hidden) load().catch(() => {}); }, 5 * 60e3);
+setInterval(() => { if (!document.hidden) load().catch(() => {}); }, 5 * 60e3);

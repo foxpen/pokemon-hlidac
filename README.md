@@ -29,14 +29,12 @@ Stack: statický web (`public/`) + Netlify Functions (Node, ESM) + Netlify Blobs
 
 | Proměnná | Povinná | Popis |
 |---|---|---|
-| `APP_PASSWORD` | ✅ | heslo do webu |
-| `SESSION_SECRET` | ✅ | náhodný řetězec ≥ 32 znaků (podpis cookie) |
 | `TELEGRAM_BOT_TOKEN` | – | token bota od @BotFather |
 | `TELEGRAM_CHAT_ID` | – | kam bot píše (tvoje chat ID) |
 | `DISCORD_WEBHOOK_URL` | – | webhook kanálu |
 
 3. Po změně env proměnných **Deploys → Trigger deploy**.
-4. Otevři web → Nastavení → **Poslat testovací zprávu**.
+4. Otevři web → Nastavení → **Poslat testovací zprávu** (jen když jsi nastavil Telegram nebo Discord).
 
 Naplánované funkce (`cron-stock` každých 10 min, `cron-scan` každých 30 min, `cron-sets` každých 20 min) běží jen na produkčním deployi, ne v preview. Edice se po nasazení plní postupně (PokeData omezuje počet požadavků): nejnovější sety během první hodiny, všech ~165 zhruba za 10 hodin, pak se každý set obnoví jednou denně.
 
@@ -55,7 +53,7 @@ npm install
 npm run dev        # netlify dev (npx netlify-cli) na http://localhost:8888
 ```
 
-Lokálně je potřeba `.env` s `APP_PASSWORD` a `SESSION_SECRET` (soubor je v `.gitignore`). Netlify Blobs fungují v `netlify dev` lokálně. Cron lokálně neběží — použij v Nastavení „Skenovat teď“ / „Zkontrolovat hlídané“.
+Web je bez přihlášení (stránka má `noindex`, adresu zná jen majitel). Volitelné tokeny pro notifikace dej lokálně do `.env` (je v `.gitignore`). Netlify Blobs fungují v `netlify dev` lokálně. Cron lokálně neběží — použij v Nastavení „Skenovat teď“ / „Zkontrolovat hlídané“.
 
 Testy parserů proti živým webům:
 

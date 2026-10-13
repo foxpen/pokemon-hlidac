@@ -1,11 +1,11 @@
 // POST {job: stock|scan, shop?} — ruční spuštění kontroly z dashboardu.
 // Běžná funkce má na Netlify limit 10 s, proto kratší deadline; zbytek dodělá cron.
-import { authed, json } from './_lib/auth.js';
+import { endpoint, json } from './_lib/http-response.js';
 import { runStock, runScan } from './_lib/jobs.js';
 import { notify } from './_lib/notify.js';
 import { runSets } from './_lib/pokedata.js';
 
-export default authed(async (req) => {
+export default endpoint(async (req) => {
   const { job, shop } = await req.json().catch(() => ({}));
   const deadline = Date.now() + 7000;
   if (job === 'stock') return json(await runStock({ deadline }));

@@ -10,3 +10,4 @@
   [headers.values]
     X-Frame-Options = "DENY"
     Referrer-Policy = "same-origin"
+    X-Robots-Tag = "noindex, nofollow"

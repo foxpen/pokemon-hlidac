@@ -1,8 +1,8 @@
 // POST {action: add|remove} — ručně zadané termíny vydání (oficiální ohlášení, CZ distribuce…).
-import { authed, json } from './_lib/auth.js';
+import { endpoint, json } from './_lib/http-response.js';
 import { getJson, setJson } from './_lib/store.js';
 
-export default authed(async (req) => {
+export default endpoint(async (req) => {
   const body = await req.json().catch(() => ({}));
   const list = await getJson('releases', []);
 

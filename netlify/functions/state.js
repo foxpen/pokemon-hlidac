@@ -1,10 +1,10 @@
 // GET — všechno pro dashboard jedním dotazem (data jsou malá, stovky položek).
-import { authed, json } from './_lib/auth.js';
+import { endpoint, json } from './_lib/http-response.js';
 import { getJson, listJson, getSettings } from './_lib/store.js';
 import { SHOPS } from './_lib/shops.js';
 import { configured } from './_lib/notify.js';
 
-export default authed(async () => {
+export default endpoint(async () => {
   const [watch, settings, feedStock, feedScan, news, releases, runStock, runScan, ...shopStates] = await Promise.all([
     listJson('watch/'),
     getSettings(),

@@ -1,8 +1,8 @@
 // POST — uložení nastavení notifikací.
-import { authed, json } from './_lib/auth.js';
+import { endpoint, json } from './_lib/http-response.js';
 import { setJson, getSettings, DEFAULT_SETTINGS } from './_lib/store.js';
 
-export default authed(async (req) => {
+export default endpoint(async (req) => {
   const body = await req.json().catch(() => ({}));
   const cur = await getSettings();
   const next = { ...cur };
