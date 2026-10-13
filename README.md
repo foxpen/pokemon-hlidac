@@ -12,7 +12,7 @@ Stack: statický web (`public/`) + Netlify Functions (Node, ESM) + Netlify Blobs
 | **Hlídám** | Produkty jako trenérské karty (cena místo HP, holo lesk). Vložíš URL produktu z libovolného CZ e-shopu → kontrola každých 10 min. Upozorní na naskladnění, spuštění předprodeje a zlevnění (volitelně až pod cílovou cenu). Graf vývoje ceny. |
 | **Edice** | Všechny anglické a japonské sety za posledních 8 let (PokeData): logo, nejdražší karta, hodnota top 10 karet a celého setu, cena balíčku a **chase index** (top 10 karet ÷ cena 36 balíčků, orientační). Detail: galerie nejdražších karet (raw + PSA 10), zapečetěné produkty trh USA vs. nejlevnější nabídka v ČR. |
 | **Trh CZ** | Katalog Pokémon produktů ze všech skenovaných obchodů. Hledání napříč obchody („pitch black etb“) seřadí nabídky a ukáže nejlevnější dostupnou. |
-| **Kalendář** | Data vydání z předprodejů (Černý rytíř je uvádí) + ručně přidané termíny |
+| **Kalendář** | Data vydání z předprodejů (pokud je obchod uvádí) + ručně přidané termíny |
 | **Novinky** | PokeGuardian (ohlášení produktů a setů), Google News EN „Pokémon TCG“, Google News CZ „pokémon karty“ |
 | **Nastavení** | Stav notifikací + testovací zpráva, filtry notifikací, stav obchodů, ruční sken |
 
@@ -59,7 +59,7 @@ Testy parserů proti živým webům:
 
 ```bash
 node scripts/test-scan.mjs            # všechny obchody
-node scripts/test-scan.mjs tlama      # jeden obchod
+node scripts/test-scan.mjs <id>       # jeden obchod (id ze shops.js)
 node scripts/test-notify.mjs          # náhled zpráv pro Telegram/Discord (nic neodešle)
 ```
 
