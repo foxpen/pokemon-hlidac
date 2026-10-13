@@ -150,6 +150,7 @@ function setView(v) {
   $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
   $$('.content > section').forEach((s) => (s.hidden = s.dataset.view !== v));
   try { localStorage.setItem('ph_view', v); } catch {}
+  if (v === 'sets' && !SETS.data && S) loadSets().then(() => animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 })).catch((e) => toast(e.message, true));
   if (S && !shownViews.has(v)) {
     shownViews.add(v);
     const sec = $(`.content > section[data-view="${v}"]`);
@@ -500,6 +501,215 @@ function renderMarket() {
 $('#market-table').addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-watch]');
   if (b && (await addWatch(b.dataset.watch, null, b))) renderMarket();
+});
+
+// ---------- edice (sety, ceny karet z PokeData) ----------
+const SETS = { data: null, lang: 'EN', open: null, loading: null };
+const czk = (usd) => (usd == null || !SETS.data?.usdCzk ? null : usd * SETS.data.usdCzk);
+const kc = (usd) => price(czk(usd));
+
+// Cena jednoho balíčku: nejlevnější cesta (samotný booster, box, bundle, ETB).
+function packCost(s) {
+  const perBox = s.language === 'JP' ? 30 : 36;
+  const opts = [s.packUsd, s.boxUsd && s.boxUsd / perBox, s.bundleUsd && s.bundleUsd / 6, s.language === 'EN' && s.etbUsd && s.etbUsd / 9].filter((v) => v > 0);
+  return opts.length ? Math.min(...opts) : null;
+}
+// Chase index = hodnota top 10 karet / cena 36 balíčků. Orientační, nezohledňuje šanci na tah.
+function chaseIndex(s) {
+  const pc = packCost(s);
+  return pc && s.top10 ? s.top10 / (pc * 36) : null;
+}
+const idxClass = (i) => (i == null ? '' : i >= 3 ? 'hi' : i >= 1.2 ? 'mid' : 'lo');
+const idxEnergy = (i) => (i == null ? 'colorless' : i >= 3 ? 'grass' : i >= 1.2 ? 'lightning' : 'fire');
+const fmtIdx = (i) => (i == null ? '—' : `${i.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })}×`);
+
+async function loadSets() {
+  if (SETS.loading) return SETS.loading;
+  SETS.loading = api('sets').then((d) => { SETS.data = d; renderSetFilters(); renderSets(); }).finally(() => (SETS.loading = null));
+  return SETS.loading;
+}
+
+function renderSetFilters() {
+  const sel = $('#s-series');
+  const cur = sel.value;
+  const series = [...new Set(SETS.data.sets.filter((s) => s.language === SETS.lang).map((s) => s.series).filter(Boolean))];
+  sel.innerHTML = `<option value="">Všechny série</option>` + series.map((x) => `<option>${esc(x)}</option>`).join('');
+  sel.value = series.includes(cur) ? cur : '';
+}
+
+function renderSets() {
+  if (!SETS.data) return;
+  const q = norm($('#s-search').value);
+  const series = $('#s-series').value, sort = $('#s-sort').value;
+  const all = SETS.data.sets.filter((s) => s.language === SETS.lang);
+  const loaded = all.filter((s) => s.fetchedAt);
+  const rows = all.filter((s) => (!series || s.series === series) && (!q || norm(s.name).includes(q) || norm(s.code).includes(q)));
+  const key = {
+    chase: (s) => s.chase?.raw ?? -1, top10: (s) => s.top10 ?? -1, value: (s) => s.setValue ?? -1,
+    index: (s) => chaseIndex(s) ?? -1, pack: (s) => -(packCost(s) ?? 1e9), new: (s) => s.releaseDate,
+  }[sort];
+  rows.sort((a, b) => (sort === 'new' ? key(b).localeCompare(key(a)) : key(b) - key(a)));
+  $('#s-meta').textContent = `${rows.length} edic · ceny načtené u ${loaded.length} z ${all.length}` +
+    (SETS.data.usdCzk ? ` · ceny z PokeData (americký trh) přepočtené kurzem ČNB ${SETS.data.usdCzk.toLocaleString('cs-CZ')} Kč/$` : '') +
+    (loaded.length < all.length ? ' · zbytek se načte během dne' : '');
+  $('#set-grid').innerHTML = rows.map((s) => {
+    const i = chaseIndex(s), pc = packCost(s);
+    return `
+    <button class="set-tile ${s.fetchedAt ? '' : 'pending'}" data-set="${s.id}">
+      <div class="logo-wrap">
+        ${s.logo ? `<img class="logo" src="${safeUrl(s.logo)}" alt="${esc(s.name)}" loading="lazy" referrerpolicy="no-referrer">` : `<span class="logo-text">${esc(s.name)}</span>`}
+        ${s.chase?.img ? `<img class="chase-img" src="${safeUrl(s.chase.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+      </div>
+      <div class="body">
+        <h3>${s.symbol ? `<img src="${safeUrl(s.symbol)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}${esc(s.name)}</h3>
+        <span class="meta">${s.releaseDate ? fmtDate(s.releaseDate) : ''}${s.series ? ` · ${esc(s.series)}` : ''}${s.code ? ` · ${esc(s.code)}` : ''}</span>
+        ${s.chase ? `<span class="chase">Nejdražší: <b>${esc(s.chase.name)}</b> <span class="num">${kc(s.chase.raw)}</span></span>` : '<span class="chase">Ceny se ještě načítají</span>'}
+        <div class="kpis">
+          <div class="kpi"><span>Top 10 karet</span><b>${kc(s.top10)}</b></div>
+          <div class="kpi"><span>Balíček</span><b>${pc ? kc(pc) : '—'}</b></div>
+          <div class="kpi"><span>Chase index</span><b class="idx ${idxClass(i)}">${fmtIdx(i)}</b></div>
+        </div>
+      </div>
+    </button>`;
+  }).join('') || `<p class="empty">Žádná edice neodpovídá filtru.</p>`;
+}
+
+$('#sets-list').addEventListener('click', (e) => {
+  const seg = e.target.closest('[data-lang]');
+  if (seg) {
+    SETS.lang = seg.dataset.lang;
+    $$('.seg button').forEach((b) => b.classList.toggle('on', b === seg));
+    renderSetFilters(); renderSets();
+    animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 });
+    return;
+  }
+  const tile = e.target.closest('[data-set]');
+  if (tile) openSet(Number(tile.dataset.set));
+});
+['#s-search', '#s-series', '#s-sort'].forEach((s) => $(s).addEventListener('input', renderSets));
+
+// Nabídky stejné edice v českých obchodech (z katalogu skenovaných obchodů).
+const kindOf = (name) => {
+  const n = norm(name);
+  if (/booster box|display|36 bal/.test(n)) return 'box';
+  if (/elite trainer|\betb\b/.test(n)) return 'etb';
+  if (/booster bundle/.test(n)) return 'bundle';
+  if (/booster/.test(n) && !/blister|bundle|box/.test(n)) return 'pack';
+  return null;
+};
+function czOffers(set) {
+  const sn = norm(set.name).replace(/^pokemon card /, '').replace(/ japanese$/, '');
+  return S.catalog.filter((c) => {
+    const n = norm(c.name);
+    if (!n.includes(sn) || /portfolio|album|binder|obal|sleeve|deck ?box|krabick|podlozk|playmat/.test(n)) return false;
+    const jp = /japon|japan|\bjp\b/.test(n), cn = /cinsk|chinese|cina/.test(n);
+    return set.language === 'JP' ? jp : !jp && !cn;
+  });
+}
+
+async function openSet(id) {
+  const box = $('#set-detail');
+  $('#sets-list').hidden = true;
+  box.hidden = false;
+  box.innerHTML = `<div class="panel"><div class="sk sk-num"></div><div class="sk sk-line"></div><div class="sk sk-line" style="width:60%"></div></div>`;
+  window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' });
+  try {
+    const d = await api(`sets?id=${id}`);
+    SETS.open = d;
+    renderSetDetail(d);
+  } catch (e) {
+    box.innerHTML = `<div class="panel"><button class="btn btn-sm back" data-back>← Všechny edice</button><p class="empty">${esc(e.message)}. Ceny této edice se načtou během dne.</p></div>`;
+  }
+}
+
+function renderSetDetail(d) {
+  const i = chaseIndex(d), pc = packCost(d), en = idxEnergy(i);
+  const offers = czOffers(d);
+  const czBest = (kind) => offers.filter((o) => kindOf(o.name) === kind && BUYABLE.has(o.availability) && o.price).sort((a, b) => a.price - b.price)[0];
+  const sealed = d.products.filter((p) => p.kind);
+  const others = d.products.filter((p) => !p.kind && !/case|display/i.test(p.name)).slice(0, 6);
+  const verdict = i == null ? 'Chybí cena balíčků, index nejde spočítat.'
+    : i >= 3 ? 'Set má hodně drahých karet vzhledem k ceně balíčků. Pro lovce chase karet patří k zajímavějším.'
+    : i >= 1.2 ? 'Průměr. Drahé karty tu jsou, ale balíčky taky nejsou levné.'
+    : 'Top karty jsou levné vzhledem k ceně balíčků. Pro „trefu“ se nevyplácí, výhodnější je koupit konkrétní kartu.';
+  $('#set-detail').innerHTML = `
+    <div class="set-hero" style="${d.banner ? `--banner:url('${safeUrl(d.banner)}')` : ''}">
+      <div>
+        <button class="btn btn-sm back" data-back>← Všechny edice</button>
+        <h1>${esc(d.name)}</h1>
+        <div class="meta">${d.language === 'JP' ? 'Japonská' : 'Anglická'} edice · ${fmtDate(d.releaseDate)}${d.series ? ` · ${esc(d.series)}` : ''}${d.code ? ` · ${esc(d.code)}` : ''} · ${d.cardCount} karet · ceny ${ago(d.fetchedAt)}</div>
+      </div>
+      ${d.logo ? `<img class="logo" src="${safeUrl(d.logo)}" alt="${esc(d.name)}" referrerpolicy="no-referrer">` : ''}
+    </div>
+
+    <div class="set-kpis">
+      <div class="stat" style="--energy:var(--accent)"><b class="num">${kc(d.top[0]?.raw)}</b><span>nejdražší karta</span></div>
+      <div class="stat" style="--energy:var(--accent)"><b class="num">${kc(d.top10)}</b><span>top 10 karet</span></div>
+      <div class="stat" style="--energy:var(--psychic)"><b class="num">${kc(d.setValue)}</b><span>celý set (všechny karty)</span></div>
+      <div class="stat" style="--energy:var(--water)"><b class="num">${pc ? kc(pc) : '—'}</b><span>nejlevnější balíček (trh USA)</span></div>
+      <div class="stat" style="--energy:var(--${en})"><b class="num">${fmtIdx(i)}</b><span>chase index</span></div>
+    </div>
+
+    <div class="panel verdict" style="--energy:var(--${en})">
+      <span class="big">${fmtIdx(i)}</span>
+      <div>
+        <p><b>${verdict}</b></p>
+        <p>Chase index = hodnota 10 nejdražších karet ÷ cena 36 balíčků. Je to jen orientace. Nezohledňuje, jak často karta padá (Special Illustration Rare bývá zhruba 1 na několik boxů), takže skutečná očekávaná hodnota balíčku je výrazně nižší.</p>
+      </div>
+    </div>
+
+    <div class="panel mt">
+      <div class="panel-head"><h2>Nejdražší karty</h2><span class="muted">cena raw karty, pod ní PSA 10</span></div>
+      <div class="card-gallery">
+        ${d.top.slice(0, 24).map((c, n) => `
+          <div class="pcard">
+            <div class="img"><span class="rank">#${n + 1}</span>${c.img ? `<img src="${safeUrl(c.img)}" alt="${esc(c.name)}" loading="lazy" referrerpolicy="no-referrer">` : ''}</div>
+            <b>${esc(c.name)}</b>
+            <div class="price-row"><span class="num mono">${kc(c.raw)}</span><small>${c.num ? `#${esc(c.num)}` : ''}</small></div>
+            ${c.psa10 ? `<small>PSA 10: ${kc(c.psa10)}</small>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="grid-2 mt">
+      <div class="panel">
+        <div class="panel-head"><h2>Zapečetěné produkty: trh USA vs. ČR</h2></div>
+        <div class="table-wrap">
+          <table class="table compact prod-table">
+            <thead><tr><th>Produkt</th><th class="num">Trh USA</th><th class="num">Nejlevněji v ČR</th><th class="num">Rozdíl</th></tr></thead>
+            <tbody>
+              ${sealed.map((p) => {
+                const cz = czBest(p.kind);
+                const diff = cz && czk(p.usd) ? (cz.price / czk(p.usd) - 1) * 100 : null;
+                return `<tr>
+                  <td class="name">${img(p.img, 'thumb', p.name)}<span>${esc(p.name)}</span></td>
+                  <td class="num">${kc(p.usd)}</td>
+                  <td class="num">${cz ? `${ext(cz.url, price(cz.price))}<div class="meta">${esc(cz.shop)}</div>` : '<span class="muted">—</span>'}</td>
+                  <td class="num ${diff == null ? '' : diff <= 0 ? 'diff-good' : 'diff-bad'}">${diff == null ? '' : `${diff > 0 ? '+' : ''}${Math.round(diff)} %`}</td>
+                </tr>`;
+              }).join('') || '<tr><td colspan="4" class="empty">PokeData pro tuhle edici nemá ceny produktů.</td></tr>'}
+              ${others.map((p) => `<tr><td class="name">${img(p.img, 'thumb', p.name)}<span class="muted">${esc(p.name)}</span></td><td class="num">${kc(p.usd)}</td><td></td><td></td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <p class="hint">Ceny v USA jsou bez DPH a dopravy, takže česká cena o 20–30 % vyšší je běžná.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>V českých obchodech</h2><span class="muted">${offers.length}</span></div>
+        <ul class="sell-list">
+          ${offers.sort((a, b) => (BUYABLE.has(b.availability) - BUYABLE.has(a.availability)) || (a.price ?? 1e9) - (b.price ?? 1e9)).slice(0, 14).map((o) => `
+            <li>${img(o.image)}<div>${ext(o.url, esc(o.name))}<span class="meta">${esc(o.shop)} · ${AVAIL[o.availability]}</span></div><span class="num mono">${price(o.price)}</span></li>`).join('')
+            || '<li class="empty">Skenované obchody tuhle edici zrovna nemají.</li>'}
+        </ul>
+      </div>
+    </div>`;
+  animateIn($$('#set-detail .set-hero, #set-detail .stat, #set-detail .panel, #set-detail .pcard').slice(0, 30), { stagger: 0.02 });
+}
+
+$('#set-detail').addEventListener('click', (e) => {
+  if (!e.target.closest('[data-back]')) return;
+  $('#set-detail').hidden = true;
+  $('#sets-list').hidden = false;
 });
 
 // ---------- kalendář ----------

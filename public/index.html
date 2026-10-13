@@ -38,6 +38,7 @@
         <button data-view="overview" class="active">Přehled</button>
         <button data-view="watch">Hlídám</button>
         <button data-view="market">Trh CZ</button>
+        <button data-view="sets">Edice</button>
         <button data-view="calendar">Kalendář</button>
         <button data-view="news">Novinky</button>
         <button data-view="settings">Nastavení</button>
@@ -156,6 +157,31 @@
             <tbody></tbody>
           </table>
         </div>
+      </section>
+
+      <!-- EDICE -->
+      <section data-view="sets" hidden>
+        <div id="sets-list">
+          <div class="panel filters">
+            <div class="seg" role="group" aria-label="Jazyk edic">
+              <button data-lang="EN" class="on">Anglické</button>
+              <button data-lang="JP">Japonské</button>
+            </div>
+            <input id="s-search" type="search" placeholder="Hledat edici" aria-label="Hledat edici">
+            <select id="s-series" aria-label="Série"><option value="">Všechny série</option></select>
+            <select id="s-sort" aria-label="Řazení">
+              <option value="chase">Nejdražší karta</option>
+              <option value="top10">Hodnota top 10 karet</option>
+              <option value="index">Chase index (poměr k ceně balíčků)</option>
+              <option value="value">Hodnota celého setu</option>
+              <option value="pack">Nejlevnější balíček</option>
+              <option value="new">Nejnovější</option>
+            </select>
+          </div>
+          <p class="hint" id="s-meta"></p>
+          <div class="set-grid" id="set-grid"></div>
+        </div>
+        <div id="set-detail" hidden></div>
       </section>
 
       <!-- KALENDÁŘ -->
