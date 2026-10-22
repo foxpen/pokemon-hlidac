@@ -9,7 +9,7 @@ Stack: statický web (`public/`) + Netlify Functions (Node, ESM) + Netlify Blobs
 | Záložka | Co dělá |
 |---|---|
 | **Přehled** | Úvodní stránka: novinky, **Chystá se** (vydání, předprodeje, ohlášené sety), **Co letí** (produkty vyprodané ve většině obchodů / nedávno vyprodané), **Právě v prodeji** (nové a znovu naskladněné, nejlevnější obchod), časová osa událostí, tvoje hlídané |
-| **Hlídám** | Produkty jako trenérské karty (cena místo HP, holo lesk). Vložíš URL produktu z libovolného CZ e-shopu → kontrola každých 10 min. Upozorní na naskladnění, spuštění předprodeje a zlevnění (volitelně až pod cílovou cenu). Graf vývoje ceny. |
+| **Hlídám** | Produkty jako trenérské karty (cena místo HP, holo lesk). Vložíš URL produktu z libovolného CZ e-shopu → kontrola každou hodinu. Upozorní na naskladnění, spuštění předprodeje a zlevnění (volitelně až pod cílovou cenu). Graf vývoje ceny. |
 | **Edice** | Všechny anglické a japonské sety za posledních 8 let (PokeData): logo, nejdražší karta, hodnota top 10 karet a celého setu, cena balíčku a **chase index** (top 10 karet ÷ cena 36 balíčků, orientační). Detail: galerie nejdražších karet (raw + PSA 10), zapečetěné produkty trh USA vs. nejlevnější nabídka v ČR. |
 | **Trh CZ** | Katalog Pokémon produktů ze všech skenovaných obchodů. Hledání napříč obchody („pitch black etb“) seřadí nabídky a ukáže nejlevnější dostupnou. |
 | **Kalendář** | Data vydání z předprodejů (pokud je obchod uvádí) + ručně přidané termíny |
@@ -36,7 +36,7 @@ Stack: statický web (`public/`) + Netlify Functions (Node, ESM) + Netlify Blobs
 3. Po změně env proměnných **Deploys → Trigger deploy**.
 4. Otevři web → Nastavení → **Poslat testovací zprávu** (jen když jsi nastavil Telegram nebo Discord).
 
-Naplánované funkce (`cron-stock` každých 10 min, `cron-scan` každých 30 min, `cron-sets` každých 20 min) běží jen na produkčním deployi, ne v preview. Edice se po nasazení plní postupně (PokeData omezuje počet požadavků): nejnovější sety během první hodiny, všech ~165 zhruba za 10 hodin, pak se každý set obnoví jednou denně.
+Naplánované funkce (`cron-scan` v :00, `cron-stock` v :15 a `cron-sets` v :30, každá jednou za hodinu) běží jen na produkčním deployi, ne v preview. Edice se po nasazení plní postupně (PokeData omezuje počet požadavků): nejnovější sety během první hodiny, všech ~165 zhruba za 28 hodin a stejně často se pak obnovují. Edice, ze kterých máš něco ve sbírce, mají přednost a jejich ceny se ukládají každý den.
 
 ### Telegram
 1. V Telegramu napiš **@BotFather** → `/newbot` → dostaneš token → `TELEGRAM_BOT_TOKEN`.

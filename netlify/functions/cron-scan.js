@@ -1,4 +1,4 @@
-// Nové produkty v obchodech + novinky: každých 30 minut.
+// Nové produkty v obchodech + novinky: každou hodinu.
 import { runScan } from './_lib/jobs.js';
 
 export default async () => {
@@ -6,4 +6,4 @@ export default async () => {
   console.log('cron-scan', JSON.stringify(r));
 };
 
-export const config = { schedule: '*/30 * * * *' };
+export const config = { schedule: '0 * * * *' };
