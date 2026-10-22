@@ -836,7 +836,7 @@ const ME_ICON = $('#me-avatar').innerHTML;
 function renderMe(total) {
   const name = PF.data.profile?.name;
   $('#me-name').textContent = name || 'Můj profil';
-  $('#me-value').textContent = PF.data.items.length ? price(total) : 'sbírka';
+  $('#me-value').textContent = PF.data.items.length ? price(total) : '';
   for (const av of [$('#me-avatar'), $('#pf-avatar')]) {
     if (name) av.textContent = name.trim()[0].toUpperCase();
     else av.innerHTML = ME_ICON;

@@ -216,6 +216,7 @@ input::placeholder { color: var(--faint); }
 .me-text b { font-size: 13px; font-weight: 600; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .me-text small { font: 500 11.5px var(--mono); color: var(--muted); letter-spacing: -.02em; white-space: nowrap; }
 .me.active .me-text small { color: var(--accent); }
+.me-text small:empty { display: none; }
 
 /* ---------- layout: levé menu + lišta s hledáním (+ spodní menu na mobilu) ---------- */
 /* ilustrace pod celou stránkou: nahoře prosvítá, dolů se ztrácí do tmavé */
