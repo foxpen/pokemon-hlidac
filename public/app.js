@@ -864,18 +864,59 @@ function pfSeries(days) {
   return out;
 }
 
-// Profil v horní liště: jméno (s iniciálou místo ikony) a hodnota sbírky.
+// Profil v horní liště: profilovka (sprite trenéra, iniciála, nebo ikona) a hodnota sbírky.
 const ME_ICON = $('#me-avatar').innerHTML;
+// sprity z public/img/trainers (herní sprity trenérů, 80×80 px)
+const TRAINERS = [
+  ['red', 'Red'], ['blue', 'Blue'], ['ash', 'Ash'], ['misty', 'Misty'], ['brock', 'Brock'], ['erika', 'Erika'],
+  ['sabrina', 'Sabrina'], ['lance', 'Lance'], ['ethan', 'Ethan'], ['lyra', 'Lyra'], ['brendan', 'Brendan'], ['may', 'May'],
+  ['steven', 'Steven'], ['lucas', 'Lucas'], ['dawn', 'Dawn'], ['cynthia', 'Cynthia'], ['hilbert', 'Hilbert'], ['hilda', 'Hilda'],
+  ['n', 'N'], ['nate', 'Nate'], ['rosa', 'Rosa'], ['calem', 'Calem'], ['serena', 'Serena'], ['elio', 'Elio'],
+  ['selene', 'Selene'], ['victor', 'Victor'], ['gloria', 'Gloria'], ['leon', 'Leon'], ['marnie', 'Marnie'], ['raihan', 'Raihan'],
+];
+const trainerImg = (id) => `<img src="img/trainers/${id}.png" alt="" width="80" height="80" decoding="async">`;
+function paintAvatar(av, profile) {
+  const avatar = TRAINERS.some(([id]) => id === profile?.avatar) ? profile.avatar : null;
+  av.classList.toggle('has-img', !!avatar);
+  if (avatar) av.innerHTML = trainerImg(avatar);
+  else if (profile?.name) av.textContent = profile.name.trim()[0].toUpperCase();
+  else av.innerHTML = ME_ICON;
+}
 function renderMe(total) {
   const name = PF.data.profile?.name;
   $('#me-name').textContent = name || 'Můj profil';
   $('#me-value').textContent = PF.data.items.length ? price(total) : '';
-  for (const av of [$('#me-avatar'), $('#pf-avatar')]) {
-    if (name) av.textContent = name.trim()[0].toUpperCase();
-    else av.innerHTML = ME_ICON;
-  }
+  for (const av of [$('#me-avatar'), $('#pf-avatar')]) paintAvatar(av, PF.data.profile);
   $('#me').setAttribute('aria-label', `Můj profil${name ? `: ${name}` : ''}${PF.data.items.length ? `, sbírka ${price(total)}` : ''}`);
+  if (!$('#pf-avatars').hidden) renderAvatarPicker();
 }
+
+// výběr profilovky
+function renderAvatarPicker() {
+  const cur = PF.data?.profile?.avatar || null;
+  const opt = (id, label, inner) => `
+    <button class="av-opt ${id === cur ? 'on' : ''}" role="radio" aria-checked="${id === cur}" data-avatar="${id || ''}">
+      <span class="av-img">${inner}</span><span>${label}</span>
+    </button>`;
+  $('#av-grid').innerHTML = opt(null, 'Bez obrázku', ME_ICON) + TRAINERS.map(([id, label]) => opt(id, label, trainerImg(id))).join('');
+}
+function toggleAvatars(open) {
+  $('#pf-avatars').hidden = !open;
+  for (const b of [$('#pf-avatar-btn'), $('#pf-avatar-open')]) b.setAttribute('aria-expanded', String(open));
+  if (open) { renderAvatarPicker(); $('#av-grid .av-opt.on')?.focus({ preventScroll: true }); }
+}
+for (const b of [$('#pf-avatar-btn'), $('#pf-avatar-open')]) b.addEventListener('click', () => toggleAvatars($('#pf-avatars').hidden));
+$('#pf-avatars').addEventListener('click', (e) => {
+  if (e.target.closest('[data-avatar-close]')) { toggleAvatars(false); return; }
+  const o = e.target.closest('[data-avatar]');
+  if (!o || !PF.data) return;
+  const avatar = o.dataset.avatar || null;
+  PF.data.profile = { ...PF.data.profile, avatar }; // hned ukázat, uloží se na pozadí
+  renderProfile();
+  toggleAvatars(false);
+  pfSave({ action: 'profile', avatar });
+  toast(avatar ? `Profilovka: ${TRAINERS.find(([id]) => id === avatar)[1]}` : 'Profilovka odebrána');
+});
 
 async function loadPortfolio() {
   if (PF.inflight) return; // rozpracované změny by se přepsaly

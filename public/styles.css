@@ -212,6 +212,10 @@ input::placeholder { color: var(--faint); }
   box-shadow: 0 0 0 2px rgba(7, 8, 11, .9), 0 0 14px rgba(242, 194, 48, .35);
 }
 .me-avatar svg { width: 17px; height: 17px; }
+/* profilovka = sprite trenéra: zvětšený a posunutý, aby byla v kolečku vidět hlava */
+.me-avatar { position: relative; overflow: hidden; }
+.me-avatar.has-img { background: radial-gradient(circle at 50% 35%, #fff8dc, #f2c230 78%); }
+.me-avatar img { position: absolute; left: 50%; top: -2%; width: 170%; height: auto; max-width: none; transform: translateX(-50%); image-rendering: pixelated; }
 .me-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 .me-text b { font-size: 13px; font-weight: 600; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .me-text small { font: 500 11.5px var(--mono); color: var(--muted); letter-spacing: -.02em; white-space: nowrap; }
@@ -224,7 +228,7 @@ input::placeholder { color: var(--faint); }
   position: fixed; inset: 0; z-index: -2; pointer-events: none;
   background:
     linear-gradient(180deg, rgba(7, 8, 11, .62) 0, rgba(7, 8, 11, .86) 42vh, var(--bg) 82vh),
-    url('img/vecer.webp') center 35% / cover no-repeat;
+    url('img/udoli-960.webp') center 40% / cover no-repeat;
   filter: blur(3px) saturate(1.1);
   transform: scale(1.03); /* rozmazání by jinak u okrajů prosvítalo */
 }
@@ -308,7 +312,7 @@ input::placeholder { color: var(--faint); }
   background:
     linear-gradient(90deg, rgba(7, 8, 11, .9) 0%, rgba(7, 8, 11, .6) 40%, rgba(7, 8, 11, 0) 72%),
     linear-gradient(0deg, rgba(7, 8, 11, .9), rgba(7, 8, 11, 0) 48%),
-    url('img/vecer.webp') 64% 58% / cover no-repeat;
+    url('img/udoli-hero.webp') 66% 80% / cover no-repeat;
 }
 .hero-text { max-width: 520px; }
 .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
@@ -646,6 +650,27 @@ input::placeholder { color: var(--faint); }
     url('img/hory.webp') center 62% / cover no-repeat;
 }
 .pf-hero.banner p { color: rgba(236, 236, 241, .82); }
+/* výběr profilovky */
+.pf-avatar-btn { position: relative; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; flex: none; }
+.pf-avatar-btn:hover .pf-avatar { box-shadow: 0 0 0 2px var(--accent), 0 0 18px rgba(242, 194, 48, .5); }
+.pf-avatar-edit {
+  position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; display: grid; place-items: center;
+  font-size: 11px; color: var(--text); background: rgba(16, 18, 24, .95); border: 1px solid var(--line-strong); border-radius: 50%;
+}
+.pf-avatars { margin-bottom: 16px; border-color: rgba(242, 194, 48, .3); }
+.av-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.av-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 8px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 500; color: var(--muted);
+  background: rgba(0, 0, 0, .25); border: 1px solid var(--line); border-radius: var(--r-md);
+  transition: border-color .2s var(--ease), background .2s var(--ease), color .2s, transform .15s var(--ease);
+}
+.av-opt:hover { color: var(--text); border-color: rgba(242, 194, 48, .45); background: var(--panel-hover); transform: translateY(-2px); }
+.av-opt.on { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.av-img { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 50%; overflow: hidden; color: var(--accent-ink); background: radial-gradient(circle at 50% 35%, #fff8dc, #f2c230 78%); }
+.av-img img { width: 80px; height: 80px; image-rendering: pixelated; }
+.av-img svg { width: 30px; height: 30px; }
+
 /* sbírka odkudkoli: „+“ na kartě, počet kusů a „−“ */
 .pc-add {
   position: absolute; right: 8px; bottom: 8px; z-index: 1; width: 36px; height: 36px; display: grid; place-items: center;
@@ -849,8 +874,7 @@ section[data-view="profile"] .panel-head { flex-wrap: wrap; }
   .ov-news, .ov-upcoming, .ov-hot, .ov-watch { grid-column: span 12; }
 }
 @media (max-width: 960px) {
-  .bg-art { background-image: linear-gradient(180deg, rgba(7, 8, 11, .62) 0, rgba(7, 8, 11, .86) 42vh, var(--bg) 82vh), url('img/vecer-960.webp'); }
-  .hero { background-image: linear-gradient(90deg, rgba(7, 8, 11, .9) 0%, rgba(7, 8, 11, .6) 40%, rgba(7, 8, 11, 0) 72%), linear-gradient(0deg, rgba(7, 8, 11, .9), rgba(7, 8, 11, 0) 48%), url('img/vecer-960.webp'); }
+  .hero { background-image: linear-gradient(90deg, rgba(7, 8, 11, .9) 0%, rgba(7, 8, 11, .6) 40%, rgba(7, 8, 11, 0) 72%), linear-gradient(0deg, rgba(7, 8, 11, .9), rgba(7, 8, 11, 0) 48%), url('img/udoli-hero-960.webp'); }
   .pf-hero.banner { background-image: linear-gradient(90deg, rgba(7, 8, 11, .9) 0, rgba(7, 8, 11, .6) 55%, rgba(7, 8, 11, .25)), linear-gradient(0deg, rgba(7, 8, 11, .75), rgba(7, 8, 11, 0) 60%), url('img/hory-960.webp'); }
 }
 @media (max-width: 900px) {
@@ -882,7 +906,11 @@ section[data-view="profile"] .panel-head { flex-wrap: wrap; }
   }
   .content { padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
   .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
-  .hero { min-height: 0; padding: 24px 18px 18px; background-position: 70% 40%; }
+  /* na úzkém displeji je text přes světlou oblohu: ztmavit shora i zdola */
+  .hero {
+    min-height: 0; padding: 24px 18px 18px;
+    background: linear-gradient(180deg, rgba(7, 8, 11, .85), rgba(7, 8, 11, .5) 48%, rgba(7, 8, 11, .9)), url('img/udoli-hero-960.webp') 72% 70% / cover no-repeat;
+  }
   .hero h1 { font-size: 30px; }
 }
 @media (max-width: 640px) {
