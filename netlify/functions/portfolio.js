@@ -77,7 +77,9 @@ export default endpoint(async (req) => {
     }
     if (action === 'remove' || it.qty <= 0) port.items = port.items.filter((i) => i !== it);
   } else if (action === 'profile') {
-    port.profile.name = String(body.name || '').trim().slice(0, 40) || null;
+    if ('name' in body) port.profile.name = String(body.name || '').trim().slice(0, 40) || null;
+    // profilovka = id spritu trenéra z public/img/trainers (null = výchozí ikona)
+    if ('avatar' in body) port.profile.avatar = /^[a-z0-9-]{1,24}$/.test(body.avatar || '') ? body.avatar : null;
   } else {
     return json({ error: 'Neznámá akce' }, 400);
   }

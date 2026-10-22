@@ -174,13 +174,26 @@
       <!-- MŮJ PROFIL: sbírka a její hodnota -->
       <section data-view="profile" hidden>
         <div class="pf-hero banner">
-          <span class="me-avatar pf-avatar" id="pf-avatar" aria-hidden="true"></span>
+          <button class="pf-avatar-btn" id="pf-avatar-btn" aria-label="Vybrat profilovku" aria-expanded="false" aria-controls="pf-avatars">
+            <span class="me-avatar pf-avatar" id="pf-avatar" aria-hidden="true"></span>
+            <span class="pf-avatar-edit" aria-hidden="true">✎</span>
+          </button>
           <div class="grow">
             <h1 id="pf-name">Trenér</h1>
             <p class="muted" id="pf-sub">Načítám…</p>
           </div>
+          <button class="btn btn-sm" id="pf-avatar-open" aria-expanded="false" aria-controls="pf-avatars">Profilovka</button>
           <button class="btn btn-sm" id="pf-rename">Přejmenovat</button>
           <button class="btn btn-primary" id="pf-add">Přidat do sbírky</button>
+        </div>
+
+        <!-- výběr profilovky: sprity trenérů -->
+        <div class="panel pf-avatars" id="pf-avatars" hidden>
+          <div class="panel-head">
+            <h2>Vyber si trenéra</h2>
+            <button class="btn btn-sm btn-ghost" data-avatar-close>Zavřít</button>
+          </div>
+          <div class="av-grid" id="av-grid" role="radiogroup" aria-label="Profilovka"></div>
         </div>
 
         <div class="stats" id="pf-stats">
