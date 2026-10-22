@@ -127,10 +127,34 @@ function groupCatalog(items) {
   return groups;
 }
 
+// ---------- adresy (historie prohlížeče) ----------
+// Každá sekce i otevřená edice má vlastní adresu (#/edice, #/edice/567, #/profil…),
+// takže funguje Zpět a Vpřed v prohlížeči i odkaz přímo na stránku.
+const SLUG = { overview: 'prehled', watch: 'hlidam', profile: 'profil', market: 'trh', sets: 'edice', calendar: 'kalendar', news: 'novinky', settings: 'nastaveni' };
+const VIEW_OF = Object.fromEntries(Object.entries(SLUG).map(([v, slug]) => [slug, v]));
+function parseHash() {
+  const [slug, id] = location.hash.replace(/^#\/?/, '').split('/');
+  return { v: VIEW_OF[slug] || null, setId: Number(id) || null };
+}
+function pushRoute(hash, replace = false) {
+  if (location.hash === hash) return;
+  history[replace ? 'replaceState' : 'pushState'](null, '', hash);
+}
+addEventListener('popstate', () => {
+  const { v, setId } = parseHash();
+  if (!v && location.hash) return; // jiná kotva (třeba „Přeskočit na obsah“)
+  const view = v || 'overview';
+  if (view === 'sets' && setId) { openSet(setId, { push: false }); return; }
+  setView(view, { push: false });
+  if (view === 'sets') closeSetDetail();
+  window.scrollTo({ top: 0 });
+});
+
 // ---------- views ----------
 const shownViews = new Set();
 const SHEET_VIEWS = new Set(['calendar', 'news', 'settings']); // na mobilu pod „Více“
-function setView(v) {
+function setView(v, { push = true } = {}) {
+  if (push) pushRoute(`#/${SLUG[v]}`);
   $$('.nav-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
   $('#me').classList.toggle('active', v === 'profile');
   $('#more-btn').classList.toggle('active', SHEET_VIEWS.has(v));
@@ -149,7 +173,9 @@ const toTop = () => window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smoo
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('.nav-btn[data-view], #me, [data-go]');
   if (!nav) return;
-  setView(nav.dataset.view || nav.dataset.go);
+  const v = nav.dataset.view || nav.dataset.go;
+  setView(v);
+  if (v === 'sets') closeSetDetail(); // „Edice“ v menu = seznam edic
   toTop();
 });
 
@@ -633,7 +659,14 @@ function czOffers(set) {
   });
 }
 
-async function openSet(id) {
+function closeSetDetail() {
+  $('#set-detail').hidden = true;
+  $('#sets-list').hidden = false;
+}
+
+async function openSet(id, { push = true } = {}) {
+  setView('sets', { push: false });
+  if (push) pushRoute(`#/edice/${id}`);
   const box = $('#set-detail');
   $('#sets-list').hidden = true;
   box.hidden = false;
@@ -755,8 +788,8 @@ $('#set-detail').addEventListener('click', async (e) => {
     return;
   }
   if (!e.target.closest('[data-back]')) return;
-  $('#set-detail').hidden = true;
-  $('#sets-list').hidden = false;
+  closeSetDetail();
+  pushRoute('#/edice');
 });
 
 // ---------- můj profil: sbírka a její hodnota ----------
@@ -1402,7 +1435,7 @@ function searchItems(q) {
   const match = (name) => { const n = norm(name); return words.every((w) => n.includes(w) || (w === 'etb' && n.includes('elite trainer'))); };
   const sets = (SETS.data?.sets || []).filter((s) => match(s.name) || norm(s.code) === norm(q)).slice(0, 4).map((s) => ({
     img: s.logo, cls: 'logo', label: s.name, meta: `edice · ${s.language === 'JP' ? 'japonská' : 'anglická'} · ${fmtDate(s.releaseDate)}`,
-    go: () => { setView('sets'); openSet(s.id); },
+    go: () => openSet(s.id),
   }));
   const prods = (S?.groups || []).filter((g) => match(g.name))
     .sort((a, b) => (!!b.cheapest - !!a.cheapest) || (a.cheapest?.price ?? 1e9) - (b.cheapest?.price ?? 1e9))
@@ -1522,14 +1555,18 @@ function playIntro() {
 
 // ---------- start ----------
 async function start() {
-  let v = 'overview';
-  try { v = localStorage.getItem('ph_view') || v; } catch {}
+  // adresa má přednost (odkaz, obnovení stránky), jinak naposledy otevřená sekce
+  const route = parseHash();
+  let v = route.v || 'overview';
+  if (!route.v) try { v = localStorage.getItem('ph_view') || v; } catch {}
   const intro = playIntro();
   loadPortfolio().catch(() => {}); // jméno a hodnota sbírky do horní lišty
   loadSets().catch(() => {}); // nejcennější karty na Přehledu a edice ve hledání
   try { await load(); } catch (e) { toast(e.message, true); }
   await intro.finish();
-  setView(v);
+  if (v === 'sets' && route.setId) openSet(route.setId, { push: false });
+  else setView(v, { push: false });
+  pushRoute(route.setId && v === 'sets' ? `#/edice/${route.setId}` : `#/${SLUG[v]}`, true);
 }
 
 start();
