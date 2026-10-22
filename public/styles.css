@@ -160,6 +160,10 @@ input::placeholder { color: var(--faint); }
   border-bottom: 1px solid var(--line);
 }
 .tabs { display: flex; gap: 2px; overflow-x: auto; flex: 1; scrollbar-width: none; }
+/* náznak, že záložky pokračují za okrajem */
+.tabs.fade-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); }
+.tabs.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px); mask-image: linear-gradient(90deg, transparent, #000 40px); }
+.tabs.fade-l.fade-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
 .tabs button {
   font: inherit; font-weight: 500; color: var(--muted); background: none; border: 0; cursor: pointer;
   padding: 7px 12px; border-radius: var(--r-sm); white-space: nowrap; position: relative;
@@ -308,16 +312,18 @@ input::placeholder { color: var(--faint); }
   position: relative; border-radius: var(--r-lg); padding: 9px;
   background: linear-gradient(155deg, var(--frame-a), var(--frame-b) 70%, #d9b23f);
   box-shadow: 0 1px 0 rgba(255, 255, 255, .35) inset, 0 18px 40px -18px rgba(236, 200, 90, .35), 0 4px 14px -6px rgba(0, 0, 0, .8);
-  transform-style: preserve-3d; will-change: transform;
+  transform-style: preserve-3d;
 }
+/* vrstvu povyšujeme jen u karty, která se zrovna naklání */
+.tcard:hover .tcard-frame { will-change: transform; }
 /* holo fólie: duhový lem při najetí */
 .tcard-frame::before {
   content: ''; position: absolute; inset: -2px; border-radius: calc(var(--r-lg) + 2px); z-index: -1; opacity: 0;
   background: conic-gradient(from var(--holo-a, 0deg), #f2c230, #ff7ab6, #6fd3ff, #8bffa6, #f2c230);
   filter: blur(6px); transition: opacity .35s var(--ease);
-  animation: holo-spin 5s linear infinite;
 }
-.tcard:hover .tcard-frame::before, .tcard:focus-within .tcard-frame::before { opacity: .85; }
+/* rotace jen když je lem vidět — rozmazaný conic-gradient se jinak překresluje každý snímek */
+.tcard:hover .tcard-frame::before, .tcard:focus-within .tcard-frame::before { opacity: .85; animation: holo-spin 5s linear infinite; }
 @property --holo-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 @keyframes holo-spin { to { --holo-a: 360deg; } }
 
@@ -389,6 +395,7 @@ input::placeholder { color: var(--faint); }
 .table tbody tr:hover { background: rgba(255, 255, 255, .025); }
 .table tr:last-child td { border-bottom: 0; }
 .table .num { text-align: right; white-space: nowrap; font-weight: 500; }
+.table th.num { font-family: var(--font); letter-spacing: .02em; font-weight: 500; } /* hlavičky jedním písmem, mono jen čísla */
 .table td.name a { text-decoration: none; font-weight: 500; transition: color .2s; }
 .table td.name a:hover { color: var(--accent); }
 .table td.name .meta { color: var(--muted); font-size: 12px; }
@@ -492,6 +499,7 @@ input::placeholder { color: var(--faint); }
 section[data-view="profile"] .panel-head { flex-wrap: wrap; }
 #pf-period button { white-space: nowrap; }
 #pf-stats .stat b { font-size: 26px; white-space: nowrap; }
+.pf-empty .btn { margin-top: 18px; }
 #pf-stats .stat span { display: inline-flex; flex-wrap: wrap; gap: 0 4px; }
 .chg { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; letter-spacing: -.02em; }
 .chg.up { color: var(--grass); }
@@ -627,6 +635,12 @@ section[data-view="profile"] .panel-head { flex-wrap: wrap; }
 .channel { display: flex; align-items: center; gap: 9px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .dot.on { background: var(--grass); box-shadow: 0 0 10px rgba(95, 207, 124, .6); }
+/* tabulka obchodů potřebuje víc místa než formulář notifikací */
+.settings-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+#shops-table td:first-child, #shops-table td:nth-child(2) { white-space: nowrap; }
+#shops-table td:first-child a { text-decoration: none; font-weight: 500; transition: color .2s; }
+#shops-table td:first-child a:hover { color: var(--accent); }
+#shops-table .error { white-space: normal; }
 
 /* ---------- skeleton ---------- */
 .sk { position: relative; overflow: hidden; background: rgba(255, 255, 255, .05); border-radius: var(--r-xs); }

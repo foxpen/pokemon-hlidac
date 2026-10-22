@@ -128,9 +128,26 @@ function groupCatalog(items) {
 }
 
 // ---------- views ----------
+// Na úzkém displeji se záložky nevejdou: aktivní posuneme do zorného pole
+// a okraj, za kterým další pokračují, zesvětlíme (třídy fade-l / fade-r).
+function tabEdges() {
+  const t = $('#tabs');
+  t.classList.toggle('fade-l', t.scrollLeft > 2);
+  t.classList.toggle('fade-r', t.scrollLeft + t.clientWidth < t.scrollWidth - 2);
+}
+function revealTab(btn) {
+  const t = $('#tabs');
+  if (t.scrollWidth <= t.clientWidth) return tabEdges();
+  const d = btn.getBoundingClientRect().left - t.getBoundingClientRect().left;
+  t.scrollBy({ left: d - (t.clientWidth - btn.offsetWidth) / 2, behavior: REDUCED ? 'auto' : 'smooth' });
+}
+$('#tabs').addEventListener('scroll', tabEdges, { passive: true });
+addEventListener('resize', tabEdges);
+
 const shownViews = new Set();
 function setView(v) {
   $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+  revealTab($(`#tabs button[data-view="${v}"]`));
   $$('.content > section').forEach((s) => (s.hidden = s.dataset.view !== v));
   try { localStorage.setItem('ph_view', v); } catch {}
   if (v === 'sets' && !SETS.data && S) loadSets().then(() => animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 })).catch((e) => toast(e.message, true));
@@ -364,7 +381,19 @@ function renderWatch() {
 }
 
 // náklon a holo lesk karty podle kurzoru
-const tilt = { el: null };
+// quickTo: jeden znovupoužitý tween na kartu místo nového tweenu při každém pohybu myši.
+// Po odjetí myši ho přebije elastický návrat, proto se při dalším najetí založí znovu.
+const tilts = new WeakMap();
+function tiltTo(frame) {
+  let t = tilts.get(frame);
+  if (!t) {
+    gsap.set(frame, { transformPerspective: 900 });
+    const opts = { duration: 0.4, ease: 'power2.out', overwrite: true };
+    t = { y: gsap.quickTo(frame, 'rotationY', opts), x: gsap.quickTo(frame, 'rotationX', opts) };
+    tilts.set(frame, t);
+  }
+  return t;
+}
 $('#watch-list').addEventListener('pointermove', (e) => {
   const frame = e.target.closest('.tcard-frame');
   if (!frame || e.pointerType === 'touch') return;
@@ -375,13 +404,15 @@ $('#watch-list').addEventListener('pointermove', (e) => {
   art.style.setProperty('--my', `${py * 100}%`);
   art.style.setProperty('--sx', `${px * 100}%`);
   if (!motion()) return;
-  tilt.el = frame;
-  gsap.to(frame, { rotationY: (px - 0.5) * 10, rotationX: (0.5 - py) * 8, transformPerspective: 900, duration: 0.4, ease: 'power2.out', overwrite: 'auto' });
+  const t = tiltTo(frame);
+  t.y((px - 0.5) * 10);
+  t.x((0.5 - py) * 8);
 });
 $('#watch-list').addEventListener('pointerout', (e) => {
   const frame = e.target.closest('.tcard-frame');
   if (!frame || frame.contains(e.relatedTarget) || !motion()) return;
-  gsap.to(frame, { rotationY: 0, rotationX: 0, duration: 0.7, ease: 'elastic.out(1, 0.6)', overwrite: 'auto' });
+  tilts.delete(frame);
+  gsap.to(frame, { rotationY: 0, rotationX: 0, duration: 0.7, ease: 'elastic.out(1, 0.6)', overwrite: true });
 });
 
 $('#watch-list').addEventListener('click', async (e) => {
@@ -791,6 +822,11 @@ function pfSave(body) {
 function renderProfile() {
   if (!PF.data) return;
   enrichPf();
+  // prázdná sbírka = jeden úvodní blok místo prázdného grafu a prázdné tabulky
+  const empty = !PF.data.items.length;
+  $('#pf-empty').hidden = !empty;
+  $('#pf-chart-panel').hidden = empty;
+  $('#pf-table-panel').hidden = empty;
   const items = PF.data.items;
   $('#pf-name').textContent = PF.data.profile?.name || 'Trenér';
   const nCards = items.filter((i) => i.kind === 'card').reduce((s, i) => s + i.qty, 0);
@@ -913,13 +949,7 @@ addEventListener('resize', () => { clearTimeout(pfResize); pfResize = setTimeout
 function renderPfTable() {
   const tb = $('#pf-table tbody');
   const items = [...PF.data.items];
-  if (!items.length) {
-    tb.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="ball" aria-hidden="true"></div>
-      <h3>Sbírka je prázdná</h3>
-      <p>Vyber edici a naklikej karty, které máš. Přidat jdou i zapečetěné produkty (boxy, ETB, balíčky).</p>
-      <button class="btn btn-primary mt" data-pf-add>Přidat do sbírky</button></div></td></tr>`;
-    return;
-  }
+  if (!items.length) { tb.innerHTML = ''; return; } // prázdnou sbírku ukazuje #pf-empty
   const rel = (i) => (i.d7 == null || !i.w7 ? 0 : i.d7 / i.w7);
   const key = {
     value: (a, b) => (b.valueKc ?? -1) - (a.valueKc ?? -1),
@@ -946,7 +976,6 @@ function renderPfTable() {
 $('#pf-sort').addEventListener('input', renderPfTable);
 
 $('#pf-table').addEventListener('click', (e) => {
-  if (e.target.closest('[data-pf-add]')) return openPicker();
   // klik kamkoli do řádku = Upravit (na mobilu je tlačítko skryté)
   const row = e.target.closest('tr[data-id]');
   const b = e.target.closest('[data-edit]') || (row && !e.target.closest('a, button') && row.querySelector('[data-edit]'));
@@ -1012,6 +1041,7 @@ async function openPicker() {
   if (!PF.pick) $('#pk-set-search').focus({ preventScroll: true });
 }
 $('#pf-add').addEventListener('click', openPicker);
+$('#pf-empty [data-pf-add]').addEventListener('click', openPicker);
 $('#pk-close').addEventListener('click', () => { $('#pf-picker').hidden = true; });
 
 function renderPickSets() {
