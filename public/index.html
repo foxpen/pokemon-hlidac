@@ -16,6 +16,21 @@
 <body>
   <a class="skip" href="#main">Přeskočit na obsah</a>
 
+  <!-- Úvod: pokéball, který se kymácí, dokud se načítají data, pak se otevře.
+       Klik nebo klávesa ho přeskočí. Bez JS se po 4 s schová sám (CSS). -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro-stage">
+      <div class="intro-ball">
+        <span class="ib-top"></span>
+        <span class="ib-bottom"></span>
+        <span class="ib-btn"></span>
+        <span class="ib-flash"></span>
+      </div>
+      <span class="intro-shadow"></span>
+    </div>
+    <div class="intro-name">Pokémon hlídač</div>
+    <div class="intro-status" id="intro-status">Načítám trh…</div>
+  </div>
 
   <!-- Aplikace -->
   <div id="app">
@@ -24,14 +39,21 @@
       <nav class="tabs" id="tabs" aria-label="Sekce">
         <button data-view="overview" class="active">Přehled</button>
         <button data-view="watch">Hlídám</button>
-        <button data-view="profile">Můj profil</button>
         <button data-view="market">Trh CZ</button>
         <button data-view="sets">Edice</button>
         <button data-view="calendar">Kalendář</button>
         <button data-view="news">Novinky</button>
         <button data-view="settings">Nastavení</button>
       </nav>
-      <button class="btn btn-ghost btn-sm" id="refresh" aria-label="Načíst znovu" title="Načíst znovu">↻</button>
+      <div class="top-actions">
+        <button class="btn btn-ghost btn-sm" id="refresh" aria-label="Načíst znovu" title="Načíst znovu">↻</button>
+        <button class="me" id="me" data-view="profile" aria-label="Můj profil">
+          <span class="me-avatar" id="me-avatar" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+          </span>
+          <span class="me-text"><b id="me-name">Můj profil</b><small id="me-value">sbírka</small></span>
+        </button>
+      </div>
     </header>
 
     <main class="content" id="main">
@@ -124,7 +146,7 @@
       <!-- MŮJ PROFIL: sbírka a její hodnota -->
       <section data-view="profile" hidden>
         <div class="pf-hero">
-          <span class="ball pf-avatar" aria-hidden="true"></span>
+          <span class="me-avatar pf-avatar" id="pf-avatar" aria-hidden="true"></span>
           <div class="grow">
             <h1 id="pf-name">Trenér</h1>
             <p class="muted" id="pf-sub">Načítám…</p>

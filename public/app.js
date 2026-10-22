@@ -137,7 +137,7 @@ function tabEdges() {
 }
 function revealTab(btn) {
   const t = $('#tabs');
-  if (t.scrollWidth <= t.clientWidth) return tabEdges();
+  if (!btn || t.scrollWidth <= t.clientWidth) return tabEdges(); // profil není v záložkách
   const d = btn.getBoundingClientRect().left - t.getBoundingClientRect().left;
   t.scrollBy({ left: d - (t.clientWidth - btn.offsetWidth) / 2, behavior: REDUCED ? 'auto' : 'smooth' });
 }
@@ -147,6 +147,7 @@ addEventListener('resize', tabEdges);
 const shownViews = new Set();
 function setView(v) {
   $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+  $('#me').classList.toggle('active', v === 'profile');
   revealTab($(`#tabs button[data-view="${v}"]`));
   $$('.content > section').forEach((s) => (s.hidden = s.dataset.view !== v));
   try { localStorage.setItem('ph_view', v); } catch {}
@@ -159,6 +160,7 @@ function setView(v) {
   }
 }
 $('#tabs').addEventListener('click', (e) => { if (e.target.dataset.view) setView(e.target.dataset.view); });
+$('#me').addEventListener('click', () => { setView('profile'); window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); });
 document.addEventListener('click', (e) => {
   const go = e.target.closest('[data-go]');
   if (go) { setView(go.dataset.go); window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); }
@@ -802,6 +804,19 @@ function pfSeries(days) {
   return out;
 }
 
+// Profil v horní liště: jméno (s iniciálou místo ikony) a hodnota sbírky.
+const ME_ICON = $('#me-avatar').innerHTML;
+function renderMe(total) {
+  const name = PF.data.profile?.name;
+  $('#me-name').textContent = name || 'Můj profil';
+  $('#me-value').textContent = PF.data.items.length ? price(total) : 'sbírka';
+  for (const av of [$('#me-avatar'), $('#pf-avatar')]) {
+    if (name) av.textContent = name.trim()[0].toUpperCase();
+    else av.innerHTML = ME_ICON;
+  }
+  $('#me').setAttribute('aria-label', `Můj profil${name ? `: ${name}` : ''}${PF.data.items.length ? `, sbírka ${price(total)}` : ''}`);
+}
+
 async function loadPortfolio() {
   if (PF.inflight) return; // rozpracované změny by se přepsaly
   PF.data = await api('portfolio');
@@ -856,6 +871,7 @@ function renderProfile() {
       : { b: '—', l: 'proti nákupu · doplň nákupní ceny', e: 'var(--colorless)' },
   ];
   $('#pf-stats').innerHTML = stats.map((s) => `<div class="stat" style="--energy:${s.e}"><b>${s.b}</b><span>${s.l}</span></div>`).join('');
+  renderMe(total);
 
   renderPfChart();
   renderPfTable();
@@ -1311,11 +1327,69 @@ $('#run-stock').addEventListener('click', (e) => busy(e.target, async () => {
 
 $('#refresh').addEventListener('click', (e) => busy(e.target, load));
 
+// ---------- úvod ----------
+// Pokéball spadne, kymácí se (jako při chytání), dokud se načítají data, pak cvakne a otevře se.
+// Je to zároveň indikátor načítání: krátké načtení = krátký úvod. Klik nebo klávesa ho přeskočí.
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+function playIntro() {
+  const el = $('#intro');
+  if (!motion()) { el.remove(); return { finish: async () => {} }; }
+  el.style.animation = 'none'; // CSS pojistku převezme JS: po 6 s se otevře i bez dat (pod ním jsou skeletony)
+  const ball = $('.intro-ball', el), shadow = $('.intro-shadow', el);
+  const t0 = performance.now();
+  let skip;
+  const skipped = new Promise((r) => (skip = r));
+  setTimeout(() => skip(), 6000);
+  const onKey = () => skip();
+  el.addEventListener('pointerdown', onKey);
+  addEventListener('keydown', onKey, { once: true });
+
+  const wobble = gsap.timeline({ paused: true, repeat: -1, repeatDelay: 0.45, defaults: { ease: 'sine.inOut', transformOrigin: '50% 90%' } })
+    .to(ball, { rotation: -18, duration: 0.16 })
+    .to(ball, { rotation: 15, duration: 0.24 })
+    .to(ball, { rotation: -7, duration: 0.18 })
+    .to(ball, { rotation: 0, duration: 0.14 });
+  const enter = gsap.timeline({ onComplete: () => wobble.play() })
+    .from(ball, { y: -180, duration: 0.8, ease: 'bounce.out' })
+    .from(shadow, { scale: 0.3, autoAlpha: 0, duration: 0.8, ease: 'bounce.out' }, '<')
+    .from('.intro-name, .intro-status', { y: 10, autoAlpha: 0, stagger: 0.08, duration: 0.45, ease: 'power3.out' }, '-=0.35');
+  const slow = setTimeout(() => { $('#intro-status').textContent = 'Ještě chvilku, sbírám data z obchodů…'; }, 2500);
+
+  let done = null;
+  const finish = () => (done ||= (async () => {
+    // minimálně jedno kymácnutí, ať úvod nebliká; přeskočení to zkrátí
+    await Promise.race([wait(Math.max(0, 1300 - (performance.now() - t0))), skipped]);
+    clearTimeout(slow);
+    wobble.pause();
+    enter.progress(1);
+    $('#intro-status').textContent = 'Hotovo';
+    await gsap.timeline({ defaults: { ease: 'power3.out' } })
+      .to(ball, { rotation: 0, duration: 0.12 })
+      .addLabel('click')
+      .to('.ib-btn', { scale: 1.25, backgroundColor: '#fffbe6', boxShadow: '0 0 0 4px #0a0a0a, 0 0 28px 10px rgba(242, 194, 48, .9)', duration: 0.12 }, 'click')
+      .addLabel('open', '+=0.08')
+      .to('.ib-top', { yPercent: -70, rotation: -22, duration: 0.5 }, 'open')
+      .to('.ib-bottom', { yPercent: 70, rotation: 12, duration: 0.5 }, 'open')
+      .to('.ib-btn', { scale: 0, duration: 0.25, ease: 'power2.in' }, 'open')
+      .fromTo('.ib-flash', { scale: 0, autoAlpha: 1 }, { scale: 26, autoAlpha: 0, duration: 0.7, ease: 'power2.out' }, 'open')
+      .to('.intro-name, .intro-status, .intro-shadow', { autoAlpha: 0, duration: 0.25 }, 'open')
+      .to(el, { autoAlpha: 0, duration: 0.35, ease: 'power1.in' }, 'open+=0.3');
+    el.removeEventListener('pointerdown', onKey);
+    removeEventListener('keydown', onKey);
+    el.remove();
+  })());
+  skipped.then(finish);
+  return { finish };
+}
+
 // ---------- start ----------
 async function start() {
   let v = 'overview';
   try { v = localStorage.getItem('ph_view') || v; } catch {}
+  const intro = playIntro();
+  loadPortfolio().catch(() => {}); // jméno a hodnota sbírky do horní lišty
   try { await load(); } catch (e) { toast(e.message, true); }
+  await intro.finish();
   setView(v);
 }
 
