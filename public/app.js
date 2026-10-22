@@ -134,6 +134,7 @@ function setView(v) {
   $$('.content > section').forEach((s) => (s.hidden = s.dataset.view !== v));
   try { localStorage.setItem('ph_view', v); } catch {}
   if (v === 'sets' && !SETS.data && S) loadSets().then(() => animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 })).catch((e) => toast(e.message, true));
+  if (v === 'profile') PF.data ? renderPfChart() : loadPortfolio().catch((e) => toast(e.message, true));
   if (S && !shownViews.has(v)) {
     shownViews.add(v);
     const sec = $(`.content > section[data-view="${v}"]`);
@@ -150,6 +151,7 @@ async function load() {
   S = await api('state');
   S.groups = groupCatalog(S.catalog);
   render();
+  if (PF.data) loadPortfolio().catch(() => {});
 }
 
 function render() {
@@ -563,7 +565,7 @@ $('#sets-list').addEventListener('click', (e) => {
   const seg = e.target.closest('[data-lang]');
   if (seg) {
     SETS.lang = seg.dataset.lang;
-    $$('.seg button').forEach((b) => b.classList.toggle('on', b === seg));
+    $$('#sets-list .seg button').forEach((b) => b.classList.toggle('on', b === seg));
     renderSetFilters(); renderSets();
     animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 });
     return;
@@ -695,6 +697,448 @@ $('#set-detail').addEventListener('click', (e) => {
   if (!e.target.closest('[data-back]')) return;
   $('#set-detail').hidden = true;
   $('#sets-list').hidden = false;
+});
+
+// ---------- můj profil: sbírka a její hodnota ----------
+// PokeData dává jen aktuální ceny, historii skládá server po dnech (pricehist) od přidání položky.
+const PF = { data: null, days: 30, pick: null, queue: Promise.resolve(), inflight: 0 };
+const GRADE = { raw: 'raw', psa9: 'PSA 9', psa10: 'PSA 10' };
+const pfKc = (usd) => (usd == null || !PF.data?.usdCzk ? null : usd * PF.data.usdCzk);
+const dayAgo = (n) => new Date(Date.now() - n * DAY).toISOString().slice(0, 10);
+const plural = (n, one, few, many) => `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
+const signed = (v) => (v == null ? '—' : `${v > 0.5 ? '+' : v < -0.5 ? '−' : ''}${price(Math.abs(v))}`);
+const pct = (p) => `${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p * 100).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %`;
+const dirOf = (diff, base) => (!base || Math.abs(diff / base) < 0.0005 ? 'flat' : diff > 0 ? 'up' : 'down');
+// změna se šipkou a znaménkem, aby nebyla poznat jen podle barvy
+function chg(diff, base) {
+  if (diff == null || !base) return '<span class="muted">—</span>';
+  const d = dirOf(diff, base);
+  return `<span class="chg ${d}">${d === 'up' ? '▲' : d === 'down' ? '▼' : '•'} ${pct(diff / base)}</span>`;
+}
+
+// Body ceny položky [[den, usd]]: cena při přidání, denní záznamy a aktuální cena.
+function pricePoints(it) {
+  const m = new Map();
+  if (it.addedUsd != null) m.set(it.addedAt.slice(0, 10), it.addedUsd);
+  for (const [d, u] of it.hist || []) m.set(d, u);
+  if (it.usd != null && it.pricedAt) m.set(it.pricedAt.slice(0, 10), it.usd);
+  return [...m].sort((a, b) => a[0].localeCompare(b[0]));
+}
+// Cena v daný den = poslední známá. Před prvním záznamem první známá (bez dat se nepočítá změna).
+function priceOn(pts, day) {
+  let v = pts[0]?.[1] ?? null;
+  for (const [d, u] of pts) { if (d > day) break; v = u; }
+  return v;
+}
+
+function enrichPf() {
+  for (const it of PF.data.items) {
+    it.pts = pricePoints(it);
+    it.now = it.usd ?? it.pts.at(-1)?.[1] ?? null;
+    it.valueKc = it.now == null ? null : pfKc(it.now) * it.qty;
+    const w = priceOn(it.pts, dayAgo(7));
+    it.d7 = it.now == null || w == null ? null : (it.now - w) * it.qty;
+    it.w7 = w == null ? null : w * it.qty;
+    it.costKc = it.buyPrice == null ? null : it.buyPrice * it.qty;
+    it.profitKc = it.costKc == null || it.valueKc == null ? null : it.valueKc - it.costKc;
+  }
+}
+
+function changeSince(days) {
+  let diff = 0, base = 0;
+  for (const it of PF.data.items) {
+    if (it.now == null) continue;
+    const then = priceOn(it.pts, dayAgo(days));
+    diff += pfKc(it.now - then) * it.qty;
+    base += pfKc(then) * it.qty;
+  }
+  return { diff, base };
+}
+
+const firstDay = () => PF.data.items.filter((i) => i.pts.length).map((i) => i.pts[0][0]).sort()[0] || null;
+
+// Hodnota dnešní sbírky den po dni (dnešní počty kusů × tehdejší ceny).
+function pfSeries(days) {
+  const items = PF.data.items.filter((i) => i.pts.length);
+  let start = firstDay();
+  if (!start) return [];
+  if (days && start < dayAgo(days)) start = dayAgo(days);
+  const out = [];
+  for (let t = Date.parse(start + 'T00:00:00Z'); t <= Date.now(); t += DAY) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    out.push([d, items.reduce((s, i) => s + pfKc(priceOn(i.pts, d)) * i.qty, 0)]);
+  }
+  return out;
+}
+
+async function loadPortfolio() {
+  if (PF.inflight) return; // rozpracované změny by se přepsaly
+  PF.data = await api('portfolio');
+  renderProfile();
+}
+
+// Změny jdou na server jedna po druhé (rychlé klikání by si jinak přepisovalo sbírku).
+// Stav ze serveru se převezme až po poslední z nich, do té doby platí lokální úprava.
+function pfSave(body) {
+  PF.inflight++;
+  PF.queue = PF.queue
+    .then(() => api('portfolio', body))
+    .then((d) => { if (--PF.inflight === 0) { PF.data = d; renderProfile(); renderPickCounts(); } })
+    .catch((e) => { PF.inflight--; toast(e.message, true); return loadPortfolio(); });
+  return PF.queue;
+}
+
+function renderProfile() {
+  if (!PF.data) return;
+  enrichPf();
+  const items = PF.data.items;
+  $('#pf-name').textContent = PF.data.profile?.name || 'Trenér';
+  const nCards = items.filter((i) => i.kind === 'card').reduce((s, i) => s + i.qty, 0);
+  const nProds = items.filter((i) => i.kind === 'product').reduce((s, i) => s + i.qty, 0);
+  $('#pf-sub').textContent = items.length
+    ? `${plural(nCards, 'karta', 'karty', 'karet')} · ${plural(nProds, 'zapečetěný produkt', 'zapečetěné produkty', 'zapečetěných produktů')} · ${plural(new Set(items.map((i) => i.setId)).size, 'edice', 'edice', 'edic')}`
+    : 'Sbírka je zatím prázdná. Přidej karty, které máš, a uvidíš, kolik má hodnotu a jak se jí vede.';
+
+  const total = items.reduce((s, i) => s + (i.valueKc || 0), 0);
+  const bought = items.filter((i) => i.profitKc != null);
+  const cost = bought.reduce((s, i) => s + i.costKc, 0), profit = bought.reduce((s, i) => s + i.profitKc, 0);
+  const energy = (d) => ({ up: 'var(--grass)', down: 'var(--fire)', flat: 'var(--colorless)' })[d];
+  // změna za období; když ceny sbírám kratší dobu, řekne to
+  const since = firstDay();
+  const have = since ? Math.floor((Date.parse(today()) - Date.parse(since)) / DAY) : 0;
+  const change = (n, label) => {
+    if (have < 1) return { b: '—', l: `${label} · zatím bez historie`, e: 'var(--colorless)' };
+    const c = changeSince(n);
+    return { b: signed(c.diff), l: `${label}${have < n ? ` (data za ${plural(have, 'den', 'dny', 'dní')})` : ''} · ${chg(c.diff, c.base)}`, e: energy(dirOf(c.diff, c.base)) };
+  };
+  const stats = [
+    { b: price(total), l: 'hodnota sbírky', e: 'var(--accent)' },
+    change(1, 'za 24 h'),
+    change(30, 'za 30 dní'),
+    bought.length
+      ? { b: signed(profit), l: `proti nákupu · ${chg(profit, cost)}${bought.length < items.length ? ` · u ${bought.length} z ${items.length}` : ''}`, e: energy(dirOf(profit, cost)) }
+      : { b: '—', l: 'proti nákupu · doplň nákupní ceny', e: 'var(--colorless)' },
+  ];
+  $('#pf-stats').innerHTML = stats.map((s) => `<div class="stat" style="--energy:${s.e}"><b>${s.b}</b><span>${s.l}</span></div>`).join('');
+
+  renderPfChart();
+  renderPfTable();
+}
+
+// osa: „12 400 Kč“, u velkých částek zkráceně „1,2 mil.“
+const axisKc = (v) => (Math.abs(v) >= 100000 ? new Intl.NumberFormat('cs-CZ', { notation: 'compact', maximumFractionDigits: 1 }).format(v) : Math.round(v).toLocaleString('cs-CZ')) + ' Kč';
+function niceTicks(lo, hi, n) {
+  const raw = (hi - lo) / n, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  const out = [];
+  for (let v = Math.floor(lo / step) * step; ; v += step) { out.push(v); if (v >= hi - step * 1e-9) break; }
+  return out;
+}
+
+function renderPfChart() {
+  const box = $('#pf-chart');
+  if (!PF.data || box.offsetParent === null) return; // skrytý graf by měl nulovou šířku
+  const s = pfSeries(PF.days);
+  const since = firstDay();
+  $('#pf-chart-note').textContent = since
+    ? `Ceny sbírám od ${fmtDate(since)}. Graf ukazuje dnešní sbírku v tehdejších cenách, takže přidání karty ho neposune nahoru.`
+    : '';
+  if (s.length < 2) {
+    box.innerHTML = `<p class="empty">${PF.data.items.length ? 'Graf se začne kreslit zítra. Ceny se ukládají jednou denně.' : 'Přidej první kartu a začnu sledovat, kolik má sbírka hodnotu.'}</p>`;
+    return;
+  }
+  const W = box.clientWidth, H = 240, L = 74, R = 12, T = 12, B = 28;
+  const vals = s.map((p) => p[1]);
+  const allBought = PF.data.items.every((i) => i.costKc != null || i.now == null);
+  const cost = allBought ? PF.data.items.reduce((a, i) => a + (i.costKc || 0), 0) : null;
+  let lo = Math.min(...vals, cost ?? Infinity), hi = Math.max(...vals, cost ?? -Infinity);
+  if (hi - lo < hi * 0.02) { const pad = Math.max(hi * 0.02, 50); lo -= pad; hi += pad; } // téměř plochou křivku neroztahovat přes celou výšku
+  const ticks = niceTicks(Math.max(0, lo), hi, 4);
+  lo = ticks[0]; hi = ticks.at(-1);
+  const x = (i) => L + (i / (s.length - 1)) * (W - L - R);
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const line = s.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[1]).toFixed(1)}`).join('');
+  const xIdx = [...new Set((W < 520 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1]).map((f) => Math.round(f * (s.length - 1))))];
+  const first = vals[0], last = vals.at(-1);
+  box.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" tabindex="0" role="img" aria-label="Hodnota sbírky od ${fmtDate(s[0][0])} do dnes: z ${price(first)} na ${price(last)}">
+      <defs><linearGradient id="pf-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent);stop-opacity:.2"/><stop offset="1" style="stop-color:var(--accent);stop-opacity:0"/></linearGradient></defs>
+      <g class="grid">${ticks.map((t) => `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text x="${L - 10}" y="${y(t) + 4}" text-anchor="end">${axisKc(t)}</text>`).join('')}</g>
+      ${cost != null ? `<line class="cost" x1="${L}" x2="${W - R}" y1="${y(cost)}" y2="${y(cost)}"/><text class="cost-l" x="${W - R}" y="${y(cost) - 6}" text-anchor="end">nákup ${price(cost)}</text>` : ''}
+      <path class="area" d="${line}L${x(s.length - 1)},${H - B}L${L},${H - B}Z"/>
+      <path class="line" d="${line}"/>
+      <g class="xl">${xIdx.map((i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === s.length - 1 ? 'end' : 'middle'}">${fmtDay(s[i][0])}</text>`).join('')}</g>
+      <g class="hover" visibility="hidden"><line class="cross" y1="${T}" y2="${H - B}"/><circle r="5"/></g>
+    </svg>
+    <div class="pf-tip" hidden></div>`;
+
+  const svg = box.querySelector('svg'), hov = svg.querySelector('.hover'), tip = box.querySelector('.pf-tip');
+  let cur = s.length - 1;
+  const show = (i) => {
+    cur = Math.max(0, Math.min(s.length - 1, i));
+    const [d, v] = s[cur], cx = x(cur), cy = y(v);
+    hov.setAttribute('visibility', 'visible');
+    hov.querySelector('line').setAttribute('x1', cx);
+    hov.querySelector('line').setAttribute('x2', cx);
+    hov.querySelector('circle').setAttribute('cx', cx);
+    hov.querySelector('circle').setAttribute('cy', cy);
+    tip.innerHTML = `<b>${price(v)}</b><span>${fmtDate(d)}${cur ? ` · ${chg(v - first, first)} od ${fmtDay(s[0][0])}` : ''}</span>`;
+    tip.hidden = false;
+    tip.style.left = `${Math.max(tip.offsetWidth / 2, Math.min(W - tip.offsetWidth / 2, cx))}px`;
+    tip.style.top = `${Math.max(0, cy - tip.offsetHeight - 14)}px`;
+  };
+  const hide = () => { hov.setAttribute('visibility', 'hidden'); tip.hidden = true; };
+  svg.addEventListener('pointermove', (e) => {
+    const r = svg.getBoundingClientRect();
+    show(Math.round((((e.clientX - r.left) * (W / r.width)) - L) / (W - L - R) * (s.length - 1)));
+  });
+  svg.addEventListener('pointerleave', hide);
+  svg.addEventListener('blur', hide);
+  svg.addEventListener('focus', () => show(cur));
+  svg.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); show(cur + (e.key === 'ArrowLeft' ? -1 : 1)); }
+  });
+}
+
+$('#pf-period').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-days]');
+  if (!b) return;
+  PF.days = Number(b.dataset.days);
+  $$('#pf-period button').forEach((x) => x.classList.toggle('on', x === b));
+  renderPfChart();
+});
+let pfResize;
+addEventListener('resize', () => { clearTimeout(pfResize); pfResize = setTimeout(renderPfChart, 150); });
+
+function renderPfTable() {
+  const tb = $('#pf-table tbody');
+  const items = [...PF.data.items];
+  if (!items.length) {
+    tb.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="ball" aria-hidden="true"></div>
+      <h3>Sbírka je prázdná</h3>
+      <p>Vyber edici a naklikej karty, které máš. Přidat jdou i zapečetěné produkty (boxy, ETB, balíčky).</p>
+      <button class="btn btn-primary mt" data-pf-add>Přidat do sbírky</button></div></td></tr>`;
+    return;
+  }
+  const rel = (i) => (i.d7 == null || !i.w7 ? 0 : i.d7 / i.w7);
+  const key = {
+    value: (a, b) => (b.valueKc ?? -1) - (a.valueKc ?? -1),
+    up: (a, b) => rel(b) - rel(a),
+    down: (a, b) => rel(a) - rel(b),
+    profit: (a, b) => (b.profitKc ?? -1e12) - (a.profitKc ?? -1e12),
+    new: (a, b) => b.addedAt.localeCompare(a.addedAt),
+    name: (a, b) => a.name.localeCompare(b.name, 'cs'),
+  }[$('#pf-sort').value];
+  items.sort(key);
+  tb.innerHTML = items.map((it) => `
+    <tr data-id="${esc(it.id)}">
+      <td>${img(it.img, it.kind === 'card' ? 'thumb pf-thumb' : 'thumb', it.name)}</td>
+      <td class="name"><b>${esc(it.name)}</b>
+        <div class="meta">${esc(it.setName)}${it.num ? ` · #${esc(it.num)}` : ''} · ${it.kind === 'card' ? GRADE[it.grade] : 'zapečetěné'}</div></td>
+      <td class="num">${it.qty}</td>
+      <td class="num hide-sm">${price(pfKc(it.now))}</td>
+      <td class="num">${price(it.valueKc)}<div class="meta show-sm">${chg(it.d7, it.w7)}</div></td>
+      <td class="num hide-sm">${chg(it.d7, it.w7)}</td>
+      <td class="num hide-sm">${it.profitKc == null ? '<span class="muted">—</span>' : `${chg(it.profitKc, it.costKc)}<div class="meta">${signed(it.profitKc)}</div>`}</td>
+      <td class="hide-sm"><button class="btn btn-sm" data-edit aria-expanded="false">Upravit</button></td>
+    </tr>`).join('');
+}
+$('#pf-sort').addEventListener('input', renderPfTable);
+
+$('#pf-table').addEventListener('click', (e) => {
+  if (e.target.closest('[data-pf-add]')) return openPicker();
+  // klik kamkoli do řádku = Upravit (na mobilu je tlačítko skryté)
+  const row = e.target.closest('tr[data-id]');
+  const b = e.target.closest('[data-edit]') || (row && !e.target.closest('a, button') && row.querySelector('[data-edit]'));
+  if (!b) return;
+  const tr = b.closest('tr');
+  const open = tr.nextElementSibling?.classList.contains('pf-edit');
+  $$('#pf-table .pf-edit').forEach((x) => x.remove());
+  $$('#pf-table [data-edit]').forEach((x) => x.setAttribute('aria-expanded', 'false'));
+  if (open) return;
+  const it = PF.data.items.find((i) => i.id === tr.dataset.id);
+  b.setAttribute('aria-expanded', 'true');
+  tr.insertAdjacentHTML('afterend', `
+    <tr class="pf-edit"><td colspan="8">
+      <form class="pf-edit-form">
+        <label class="field"><span>Kusů</span><input name="qty" type="number" min="0" step="1" value="${it.qty}" required></label>
+        ${it.kind === 'card' ? `<label class="field"><span>Stav karty</span><select name="grade">${Object.entries(GRADE).map(([k, l]) => `<option value="${k}" ${k === it.grade ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+        <label class="field"><span>Nákupní cena za kus (Kč)</span><input name="buyPrice" type="number" min="0" step="1" value="${it.buyPrice ?? ''}" placeholder="nepovinné"></label>
+        <button class="btn btn-primary" type="submit">Uložit</button>
+        <button class="btn btn-danger" type="button" data-remove>Odebrat ze sbírky</button>
+      </form>
+    </td></tr>`);
+  const f = tr.nextElementSibling.querySelector('form');
+  f.qty.focus();
+  f.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    busy(f.querySelector('[type=submit]'), async () => {
+      await pfSave({ action: 'update', id: it.id, qty: f.qty.value, buyPrice: f.buyPrice.value, ...(f.grade ? { grade: f.grade.value } : {}) });
+      toast('Uloženo');
+    });
+  });
+  f.querySelector('[data-remove]').addEventListener('click', (ev) => {
+    if (!armed(ev.currentTarget, 'Opravdu odebrat?')) return;
+    busy(ev.currentTarget, () => pfSave({ action: 'remove', id: it.id }));
+  });
+});
+
+$('#pf-rename').addEventListener('click', () => {
+  const h = $('#pf-name');
+  if ($('#pf-rename-form') || !PF.data) return;
+  const f = document.createElement('form');
+  f.id = 'pf-rename-form';
+  f.className = 'pf-rename-form';
+  f.innerHTML = `<input name="nick" maxlength="40" value="${esc(PF.data.profile?.name || '')}" placeholder="Jméno nebo přezdívka" aria-label="Jméno profilu"><button class="btn btn-primary btn-sm" type="submit">Uložit</button>`;
+  h.hidden = true;
+  h.after(f);
+  f.nick.focus();
+  const close = () => { f.remove(); h.hidden = false; };
+  f.nick.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    busy(f.querySelector('button'), async () => { await pfSave({ action: 'profile', name: f.nick.value }); close(); });
+  });
+});
+
+// ---- výběr karet do sbírky ----
+async function openPicker() {
+  if (!PF.data) return;
+  $('#pf-picker').hidden = false;
+  if (!PF.pick) { $('#pk-sets').hidden = false; $('#pk-set').hidden = true; }
+  $('#pf-picker').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+  if (!SETS.data) await loadSets().catch((e) => toast(e.message, true));
+  renderPickSets();
+  if (!PF.pick) $('#pk-set-search').focus({ preventScroll: true });
+}
+$('#pf-add').addEventListener('click', openPicker);
+$('#pk-close').addEventListener('click', () => { $('#pf-picker').hidden = true; });
+
+function renderPickSets() {
+  const q = norm($('#pk-set-search').value);
+  const mine = new Set(PF.data.items.map((i) => i.setId));
+  const list = (SETS.data?.sets || [])
+    .filter((s) => !q || norm(s.name).includes(q) || norm(s.code).includes(q))
+    .sort((a, b) => (mine.has(b.id) - mine.has(a.id)) || b.releaseDate.localeCompare(a.releaseDate))
+    .slice(0, q ? 30 : 12);
+  $('#pk-set-list').innerHTML = list.map((s) => `
+    <button class="pk-set-btn" data-pick="${s.id}">
+      ${s.logo ? `<img src="${safeUrl(s.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+      <span><b>${esc(s.name)}</b><small>${s.language === 'JP' ? 'japonská' : 'anglická'} · ${fmtDate(s.releaseDate)}${mine.has(s.id) ? ' · máš z ní' : ''}</small></span>
+    </button>`).join('') || `<p class="empty">Žádná edice neodpovídá. Zkus anglický název nebo kód setu.</p>`;
+}
+$('#pk-set-search').addEventListener('input', renderPickSets);
+$('#pk-set-list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pick]');
+  if (b) pickSet(Number(b.dataset.pick));
+});
+
+async function pickSet(id) {
+  const box = $('#pk-set');
+  $('#pk-sets').hidden = true;
+  box.hidden = false;
+  box.innerHTML = `<div class="sk sk-line" style="width:40%"></div><div class="pk-grid">${'<div class="sk pk-sk"></div>'.repeat(12)}</div>`;
+  try {
+    PF.pick = await api(`portfolio?set=${id}`);
+    renderPickSet();
+  } catch (e) {
+    PF.pick = null;
+    box.innerHTML = `<button class="btn btn-sm" data-pk-back>← Jiná edice</button><p class="empty">${esc(e.message)}</p>`;
+  }
+}
+
+const ownedQty = (kind, refId) => PF.data.items.filter((i) => i.kind === kind && i.refId === refId).reduce((s, i) => s + i.qty, 0);
+
+function renderPickSet() {
+  const d = PF.pick;
+  $('#pk-title').textContent = `Přidat do sbírky: ${d.name}`;
+  $('#pk-set').innerHTML = `
+    <div class="pk-tools">
+      <button class="btn btn-sm" data-pk-back>← Jiná edice</button>
+      <input id="pk-filter" type="search" placeholder="Filtrovat podle jména nebo čísla" aria-label="Filtrovat karty">
+      <label class="check"><input type="checkbox" id="pk-mine"> Jen co mám</label>
+    </div>
+    <p class="hint">Klik na kartu přidá jeden kus (raw). Stav (PSA 9 / PSA 10), počet a nákupní cenu upravíš pak v tabulce sbírky.</p>
+    <div class="pk-grid" id="pk-grid"></div>
+    ${d.products.length ? `<h3 class="sub">Zapečetěné produkty</h3><ul class="pk-prods" id="pk-prods"></ul>` : ''}
+    <div class="pk-foot"><button class="btn" data-pk-done>Hotovo</button></div>`;
+  renderPickGrid();
+}
+
+function renderPickGrid() {
+  const d = PF.pick;
+  const q = norm($('#pk-filter').value.trim()), mineOnly = $('#pk-mine').checked;
+  const ok = (name, num, kind, id) => (!q || norm(name).includes(q) || String(num ?? '') === q) && (!mineOnly || ownedQty(kind, id));
+  const cards = d.cards.filter((c) => ok(c.name, c.num, 'card', c.id));
+  $('#pk-grid').innerHTML = cards.map((c) => `
+    <div class="pk-card" data-card="${c.id}">
+      <button class="pk-art" data-add aria-label="Přidat ${esc(c.name)} #${esc(c.num)}">
+        ${c.img ? `<img src="${safeUrl(c.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<span class="pk-qty"></span>
+      </button>
+      <b title="${esc(c.name)}">${esc(c.name)}</b>
+      <div class="pk-row"><small>#${esc(c.num)}</small><span class="num">${c.raw == null ? '—' : price(pfKc(c.raw))}</span>
+        <button class="pk-minus" data-minus aria-label="Odebrat jeden kus ${esc(c.name)}">−</button></div>
+    </div>`).join('') || `<p class="empty">Žádná karta neodpovídá filtru.</p>`;
+  if ($('#pk-prods')) {
+    $('#pk-prods').innerHTML = d.products.filter((p) => ok(p.name, null, 'product', p.id)).map((p) => `
+      <li data-prod="${p.id}">
+        ${img(p.img, 'thumb', p.name)}
+        <div><b>${esc(p.name)}</b><span class="meta num">${price(pfKc(p.usd))}</span></div>
+        <span class="pk-qty"></span>
+        <button class="btn btn-sm pk-minus" data-minus aria-label="Odebrat jeden kus ${esc(p.name)}">−</button>
+        <button class="btn btn-sm" data-add>Přidat</button>
+      </li>`).join('') || `<li class="empty">Nic neodpovídá filtru.</li>`;
+  }
+  renderPickCounts();
+}
+
+// jen počty kusů — mřížka se nepřekresluje, aby neposkakovala a nenačítala obrázky znovu
+function renderPickCounts() {
+  if (!PF.pick || $('#pk-set').hidden) return;
+  $$('#pk-set [data-card], #pk-set [data-prod]').forEach((el) => {
+    const n = el.dataset.card ? ownedQty('card', Number(el.dataset.card)) : ownedQty('product', Number(el.dataset.prod));
+    el.classList.toggle('own', n > 0);
+    el.querySelector('.pk-qty').textContent = n ? `×${n}` : '';
+    el.querySelector('[data-minus]').hidden = !n;
+  });
+}
+
+$('#pk-set').addEventListener('input', (e) => { if (e.target.id === 'pk-filter' || e.target.id === 'pk-mine') renderPickGrid(); });
+$('#pk-set').addEventListener('click', (e) => {
+  if (e.target.closest('[data-pk-back]')) {
+    PF.pick = null;
+    $('#pk-title').textContent = 'Přidat do sbírky';
+    $('#pk-set').hidden = true;
+    $('#pk-sets').hidden = false;
+    renderPickSets();
+    return;
+  }
+  if (e.target.closest('[data-pk-done]')) { $('#pf-picker').hidden = true; return; }
+  const btn = e.target.closest('[data-add], [data-minus]');
+  const el = btn?.closest('[data-card], [data-prod]');
+  if (!el) return;
+  const kind = el.dataset.card ? 'card' : 'product';
+  const refId = Number(el.dataset.card || el.dataset.prod);
+  const ref = kind === 'card' ? PF.pick.cards.find((c) => c.id === refId) : PF.pick.products.find((p) => p.id === refId);
+  const items = PF.data.items;
+  if (btn.hasAttribute('data-add')) {
+    const id = kind === 'card' ? `c:${refId}:raw` : `p:${refId}`;
+    const it = items.find((i) => i.id === id);
+    const usd = kind === 'card' ? ref.raw : ref.usd;
+    if (it) it.qty++;
+    else items.push({ id, kind, refId, grade: kind === 'card' ? 'raw' : null, qty: 1, setId: PF.pick.id, setName: PF.pick.name, name: ref.name, num: ref.num || null, img: ref.img || null, buyPrice: null, addedAt: new Date().toISOString(), addedUsd: usd, usd, pricedAt: PF.pick.fetchedAt, hist: [] });
+    pfSave({ action: 'add', kind, setId: PF.pick.id, refId });
+    if (motion()) gsap.fromTo(el.querySelector('.pk-qty'), { scale: 1.5 }, { scale: 1, duration: 0.35, ease: 'back.out(3)' });
+  } else {
+    // ubírá se nejdřív raw kus, pak ostatní stavy
+    const it = items.find((i) => i.id === `c:${refId}:raw`) || items.find((i) => i.kind === kind && i.refId === refId);
+    if (!it) return;
+    it.qty--;
+    if (it.qty <= 0) PF.data.items = items.filter((i) => i !== it);
+    pfSave({ action: 'update', id: it.id, qty: Math.max(0, it.qty) });
+  }
+  renderPickCounts();
+  renderProfile();
 });
 
 // ---------- kalendář ----------

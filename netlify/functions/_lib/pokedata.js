@@ -3,6 +3,7 @@
 // pokemontcg.io nepoužíváme: pro sety Mega Evolution nemá ceny vůbec a Cardmarket tam stojí od 11/2025.
 import { fetchJson, fetchText, pool } from './http.js';
 import { getJson, setJson } from './store.js';
+import { getPortfolio, recordPrices } from './portfolio.js';
 
 const BASE = 'https://www.pokedata.io/api';
 const HEADERS = { Referer: 'https://www.pokedata.io/' };
@@ -53,7 +54,8 @@ async function fetchSetList() {
 }
 
 // Verze výpočtu — při změně se uložené sety postupně načtou znovu.
-const PARSE_VERSION = 2;
+// v3: všechny karty edice (s id) kvůli sbírce, produkty s id.
+const PARSE_VERSION = 3;
 
 // Do srovnání cen patří jen standardní produkty. Kartony, displeje, půlboxy, sady a exkluzivity
 // řetězců (Costco, Sam's Club, Pokemon Center…) mají jiný obsah i cenu.
@@ -70,13 +72,14 @@ const productKind = (p) => {
 
 async function fetchSetDetail(set) {
   const q = encodeURIComponent(set.name).replace(/%20/g, '+');
-  const [cards, products] = await Promise.all([
+  const [rawCards, products] = await Promise.all([
     fetchJson(`${BASE}/cards?set_name=${q}&tcg=&stats=kwan`, { headers: HEADERS, timeoutMs: 20000 }),
     fetchJson(`${BASE}/products?set_id=${set.id}`, { headers: HEADERS, timeoutMs: 20000 }).catch(() => []),
   ]);
-  const own = cards.filter((c) => c.set_id === set.id); // jména setů se napříč jazyky můžou opakovat
-  const priced = own
+  const own = rawCards.filter((c) => c.set_id === set.id); // jména setů se napříč jazyky můžou opakovat
+  const cards = own
     .map((c) => ({
+      id: c.id,
       name: c.name.replace(/\s+(Holofoil|Normal)$/i, ''),
       num: c.num,
       img: c.img_url,
@@ -85,11 +88,12 @@ async function fetchSetDetail(set) {
       psa10: stat(c, PSA10),
       secret: !!c.secret,
     }))
-    .filter((c) => c.raw != null);
+    .sort((a, b) => String(a.num).localeCompare(String(b.num), 'en', { numeric: true }));
+  const priced = cards.filter((c) => c.raw != null);
   priced.sort((a, b) => b.raw - a.raw);
   const sum = (arr) => Math.round(arr.reduce((s, c) => s + c.raw, 0) * 100) / 100;
 
-  const prods = (products || []).map((p) => ({ name: p.name, type: p.type, img: p.img_url, usd: p.market_value ?? null, kind: productKind(p) }));
+  const prods = (products || []).map((p) => ({ id: p.id, name: p.name, type: p.type, img: p.img_url, usd: p.market_value ?? null, kind: productKind(p) }));
   const kindPrice = (k) => prods.filter((p) => p.kind === k && p.usd).sort((a, b) => a.usd - b.usd)[0]?.usd ?? null;
 
   return {
@@ -101,7 +105,8 @@ async function fetchSetDetail(set) {
     setValue: sum(priced),
     top10: sum(priced.slice(0, 10)),
     top: priced.slice(0, 30),
-    products: prods.filter((p) => p.usd).sort((a, b) => (b.kind ? 1 : 0) - (a.kind ? 1 : 0) || b.usd - a.usd).slice(0, 24),
+    cards,
+    products: prods.filter((p) => p.usd).sort((a, b) => (b.kind ? 1 : 0) - (a.kind ? 1 : 0) || b.usd - a.usd),
     boxUsd: kindPrice('box'),
     etbUsd: kindPrice('etb'),
     bundleUsd: kindPrice('bundle'),
@@ -118,6 +123,20 @@ const summarize = (d) => ({
   boxUsd: d.boxUsd ?? null, etbUsd: d.etbUsd ?? null, bundleUsd: d.bundleUsd ?? null, packUsd: d.packUsd ?? null,
 });
 
+const BASE_FIELDS = ['id', 'name', 'code', 'language', 'series', 'releaseDate', 'logo', 'symbol', 'banner'];
+
+// Detail edice pro sbírku: když je uložený ve staré verzi (bez všech karet), načte ho hned.
+export async function loadSetDetail(id) {
+  const cur = await getJson(`set/${id}`);
+  if (cur?.v === PARSE_VERSION) return cur;
+  const idx = await getJson('sets/summary', { sets: [] });
+  const s = idx.sets.find((x) => x.id === id);
+  if (!s) return null;
+  const d = await fetchSetDetail(Object.fromEntries(BASE_FIELDS.map((k) => [k, s[k] ?? null])));
+  await setJson(`set/${id}`, d);
+  return d;
+}
+
 export async function runSets({ deadline }) {
   const idx = await getJson('sets/summary', { sets: [], listAt: null });
   // seznam setů obnovujeme jednou denně
@@ -127,10 +146,12 @@ export async function runSets({ deadline }) {
     idx.sets = list.map((s) => ({ ...(known.get(s.id) || {}), ...s }));
     idx.listAt = new Date().toISOString();
   }
-  // nejdřív nikdy nenačtené (od nejnovějších), pak nejstarší data
+  // nejdřív edice ze sbírky (kvůli denní historii cen), pak nikdy nenačtené (od nejnovějších), pak nejstarší data
+  const { items: owned } = await getPortfolio();
+  const mine = new Set(owned.map((i) => i.setId));
   const stale = idx.sets
     .filter((s) => !s.fetchedAt || s.v !== PARSE_VERSION || Date.now() - new Date(s.fetchedAt) > MAX_AGE_H * 3600e3)
-    .sort((a, b) => (a.fetchedAt ? 1 : 0) - (b.fetchedAt ? 1 : 0) || (a.fetchedAt || '').localeCompare(b.fetchedAt || '') || b.releaseDate.localeCompare(a.releaseDate))
+    .sort((a, b) => (mine.has(b.id) ? 1 : 0) - (mine.has(a.id) ? 1 : 0) || (a.fetchedAt ? 1 : 0) - (b.fetchedAt ? 1 : 0) || (a.fetchedAt || '').localeCompare(b.fetchedAt || '') || b.releaseDate.localeCompare(a.releaseDate))
     .slice(0, SETS_PER_RUN);
   let done = 0;
   let limited = false;
@@ -140,6 +161,7 @@ export async function runSets({ deadline }) {
     try {
       const d = await fetchSetDetail(s);
       await setJson(`set/${s.id}`, d);
+      await recordPrices(d, owned);
       Object.assign(s, summarize(d));
       done++;
     } catch (e) {
