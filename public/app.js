@@ -128,27 +128,13 @@ function groupCatalog(items) {
 }
 
 // ---------- views ----------
-// Na úzkém displeji se záložky nevejdou: aktivní posuneme do zorného pole
-// a okraj, za kterým další pokračují, zesvětlíme (třídy fade-l / fade-r).
-function tabEdges() {
-  const t = $('#tabs');
-  t.classList.toggle('fade-l', t.scrollLeft > 2);
-  t.classList.toggle('fade-r', t.scrollLeft + t.clientWidth < t.scrollWidth - 2);
-}
-function revealTab(btn) {
-  const t = $('#tabs');
-  if (!btn || t.scrollWidth <= t.clientWidth) return tabEdges(); // profil není v záložkách
-  const d = btn.getBoundingClientRect().left - t.getBoundingClientRect().left;
-  t.scrollBy({ left: d - (t.clientWidth - btn.offsetWidth) / 2, behavior: REDUCED ? 'auto' : 'smooth' });
-}
-$('#tabs').addEventListener('scroll', tabEdges, { passive: true });
-addEventListener('resize', tabEdges);
-
 const shownViews = new Set();
+const SHEET_VIEWS = new Set(['calendar', 'news', 'settings']); // na mobilu pod „Více“
 function setView(v) {
-  $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+  $$('.nav-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
   $('#me').classList.toggle('active', v === 'profile');
-  revealTab($(`#tabs button[data-view="${v}"]`));
+  $('#more-btn').classList.toggle('active', SHEET_VIEWS.has(v));
+  toggleSheet(false);
   $$('.content > section').forEach((s) => (s.hidden = s.dataset.view !== v));
   try { localStorage.setItem('ph_view', v); } catch {}
   if (v === 'sets' && !SETS.data && S) loadSets().then(() => animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 })).catch((e) => toast(e.message, true));
@@ -156,15 +142,24 @@ function setView(v) {
   if (S && !shownViews.has(v)) {
     shownViews.add(v);
     const sec = $(`.content > section[data-view="${v}"]`);
-    animateIn(sec.querySelectorAll('.ov-hero, .stat, .ov-grid > .panel, :scope > .panel, :scope > .hint, .table-wrap, .tcard, .news-card, .grid-2 > *'), { stagger: 0.035 });
+    animateIn(sec.querySelectorAll('.hero, .pf-hero, .stat, .ov-grid > .panel, :scope > .panel, :scope > .hint, .table-wrap, .tcard, .news-card, .grid-2 > *'), { stagger: 0.035 });
   }
 }
-$('#tabs').addEventListener('click', (e) => { if (e.target.dataset.view) setView(e.target.dataset.view); });
-$('#me').addEventListener('click', () => { setView('profile'); window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); });
+const toTop = () => window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' });
 document.addEventListener('click', (e) => {
-  const go = e.target.closest('[data-go]');
-  if (go) { setView(go.dataset.go); window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); }
+  const nav = e.target.closest('.nav-btn[data-view], #me, [data-go]');
+  if (!nav) return;
+  setView(nav.dataset.view || nav.dataset.go);
+  toTop();
 });
+
+// mobil: „Více“ otevře list s Kalendářem, Novinkami a Nastavením
+function toggleSheet(open) {
+  $('#more-sheet').hidden = !open;
+  $('#more-btn').setAttribute('aria-expanded', String(open));
+}
+$('#more-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSheet($('#more-sheet').hidden); });
+document.addEventListener('click', (e) => { if (!e.target.closest('#more-sheet, #more-btn')) toggleSheet(false); });
 
 async function load() {
   S = await api('state');
@@ -222,6 +217,7 @@ function renderOverview() {
   renderUpcoming();
   renderHot();
   renderSelling();
+  renderChase();
   renderFeed();
   renderOvWatch();
 }
@@ -285,19 +281,29 @@ function renderSelling() {
   const sell = S.groups
     .filter((g) => g.cheapest && g.cheapest.availability === 'in_stock')
     .sort((a, b) => (b.restocked - a.restocked) || (b.freshAt || '').localeCompare(a.freshAt || ''))
-    .slice(0, 7);
+    .slice(0, 10);
   $('#selling').innerHTML = sell.length ? sell.map((g) => {
     const c = g.cheapest;
     const inShops = g.items.filter((i) => BUYABLE.has(i.availability)).length;
-    return `<li>
-      ${img(g.image)}
-      <div>
-        ${ext(c.url, esc(g.name))}
-        <span class="meta">${g.restocked ? '<span class="tag t-restock">znovu skladem</span> · ' : ''}${esc(c.shop)}${inShops > 1 ? ` · skladem v ${inShops} obchodech` : ''}</span>
-      </div>
-      <span class="num mono">${price(c.price)}<small>nejlevněji</small></span>
-    </li>`;
-  }).join('') : `<li class="empty">Nic skladem</li>`;
+    return ext(c.url, `
+      <div class="tile-img">${img(g.image, '', g.name)}${g.restocked ? '<span class="tile-flag">znovu skladem</span>' : ''}</div>
+      <b>${esc(g.name)}</b>
+      <span class="tile-price num">${price(c.price)}</span>
+      <span class="tile-meta"><span class="tag t-restock"></span>${esc(c.shop)}${inShops > 1 ? ` · +${inShops - 1} další` : ''}</span>`, 'tile');
+  }).join('') : `<p class="empty">Nic skladem</p>`;
+}
+
+// Nejdražší karta z každé nové anglické edice (ze souhrnu edic) — jde rovnou přidat do sbírky.
+function renderChase() {
+  const box = $('#chase');
+  if (!SETS.data) { box.innerHTML = '<div class="sk pk-sk"></div>'.repeat(6); return; }
+  const sets = SETS.data.sets
+    .filter((s) => s.language === 'EN' && s.chase)
+    .sort((a, b) => b.releaseDate.localeCompare(a.releaseDate))
+    .slice(0, 10);
+  box.innerHTML = sets.map((s) => collectCard(s, s.chase, { sub: s.name, rate: SETS.data.usdCzk })).join('')
+    || '<p class="empty">Ceny edic se ještě načítají.</p>';
+  renderOwned();
 }
 
 function renderFeed() {
@@ -545,7 +551,7 @@ const fmtIdx = (i) => (i == null ? '—' : `${i.toLocaleString('cs-CZ', { maximu
 
 async function loadSets() {
   if (SETS.loading) return SETS.loading;
-  SETS.loading = api('sets').then((d) => { SETS.data = d; renderSetFilters(); renderSets(); }).finally(() => (SETS.loading = null));
+  SETS.loading = api('sets').then((d) => { SETS.data = d; renderSetFilters(); renderSets(); renderChase(); }).finally(() => (SETS.loading = null));
   return SETS.loading;
 }
 
@@ -681,14 +687,14 @@ function renderSetDetail(d) {
     <div class="panel mt">
       <div class="panel-head"><h2>Nejdražší karty</h2><span class="muted">cena raw karty, pod ní PSA 10</span></div>
       <div class="card-gallery">
-        ${d.top.slice(0, 24).map((c, n) => `
-          <div class="pcard">
-            <div class="img"><span class="rank">#${n + 1}</span>${c.img ? `<img src="${safeUrl(c.img)}" alt="${esc(c.name)}" loading="lazy" referrerpolicy="no-referrer">` : ''}</div>
-            <b>${esc(c.name)}</b>
-            <div class="price-row"><span class="num mono">${kc(c.raw)}</span><small>${c.num ? `#${esc(c.num)}` : ''}</small></div>
-            ${c.psa10 ? `<small>PSA 10: ${kc(c.psa10)}</small>` : ''}
-          </div>`).join('')}
+        ${d.top.slice(0, 24).map((c, n) => collectCard(d, c, { rank: n + 1, rate: SETS.data?.usdCzk, sub: `${c.num ? `#${esc(c.num)}` : ''}${c.psa10 ? ` · PSA 10: ${kc(c.psa10)}` : ''}` })).join('')}
       </div>
+    </div>
+
+    <div class="panel mt" id="sd-all">
+      <div class="panel-head"><h2>Všechny karty edice</h2><span class="muted">${d.cardCount}</span></div>
+      <p class="panel-note">Projdi celou edici a naklikej karty, které máš. Přidají se rovnou do sbírky v profilu.</p>
+      <button class="btn btn-primary" data-sd-all>Zobrazit všechny karty</button>
     </div>
 
     <div class="grid-2 mt">
@@ -696,7 +702,7 @@ function renderSetDetail(d) {
         <div class="panel-head"><h2>Zapečetěné produkty: trh USA vs. ČR</h2></div>
         <div class="table-wrap">
           <table class="table compact prod-table">
-            <thead><tr><th>Produkt</th><th class="num">Trh USA</th><th class="num">Nejlevněji v ČR</th><th class="num">Rozdíl</th></tr></thead>
+            <thead><tr><th>Produkt</th><th class="num">Trh USA</th><th class="num">Nejlevněji v ČR</th><th class="num">Rozdíl</th><th class="num">Sbírka</th></tr></thead>
             <tbody>
               ${sealed.map((p) => {
                 const cz = czBest(p.kind);
@@ -706,9 +712,10 @@ function renderSetDetail(d) {
                   <td class="num">${kc(p.usd)}</td>
                   <td class="num">${cz ? `${ext(cz.url, price(cz.price))}<div class="meta">${esc(cz.shop)}</div>` : '<span class="muted">—</span>'}</td>
                   <td class="num ${diff == null ? '' : diff <= 0 ? 'diff-good' : 'diff-bad'}">${diff == null ? '' : `${diff > 0 ? '+' : ''}${Math.round(diff)} %`}</td>
+                  <td class="num">${prodCollect(d, p)}</td>
                 </tr>`;
-              }).join('') || '<tr><td colspan="4" class="empty">PokeData pro tuhle edici nemá ceny produktů.</td></tr>'}
-              ${others.map((p) => `<tr><td class="name">${img(p.img, 'thumb', p.name)}<span class="muted">${esc(p.name)}</span></td><td class="num">${kc(p.usd)}</td><td></td><td></td></tr>`).join('')}
+              }).join('') || '<tr><td colspan="5" class="empty">PokeData pro tuhle edici nemá ceny produktů.</td></tr>'}
+              ${others.map((p) => `<tr><td class="name">${img(p.img, 'thumb', p.name)}<span class="muted">${esc(p.name)}</span></td><td class="num">${kc(p.usd)}</td><td></td><td></td><td class="num">${prodCollect(d, p)}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -723,10 +730,30 @@ function renderSetDetail(d) {
         </ul>
       </div>
     </div>`;
+  renderOwned();
   animateIn($$('#set-detail .set-hero, #set-detail .stat, #set-detail .panel, #set-detail .pcard').slice(0, 30), { stagger: 0.02 });
 }
 
-$('#set-detail').addEventListener('click', (e) => {
+// „+ Do sbírky“ u zapečetěného produktu v tabulce edice
+function prodCollect(d, p) {
+  if (p.id == null) return '';
+  regRef('product', d, p, p.usd);
+  return `<span class="own-ctl" data-own="product:${p.id}">${collectBtns('product', p.id, p.name)}<button class="btn btn-sm" data-collect="add" data-kind="product" data-ref="${p.id}" aria-label="Přidat ${esc(p.name)} do sbírky">+</button></span>`;
+}
+
+$('#set-detail').addEventListener('click', async (e) => {
+  const all = e.target.closest('[data-sd-all]');
+  if (all) {
+    // detail ve staré verzi nemá všechny karty: dočte je endpoint sbírky (a uloží novou verzi)
+    const box = $('#sd-all');
+    const d = SETS.open?.cards ? { ...SETS.open, usdCzk: SETS.data?.usdCzk } : await busy(all, () => api(`portfolio?set=${SETS.open.id}`));
+    if (!d) return;
+    $('[data-sd-all]', box).remove();
+    const holder = document.createElement('div');
+    box.append(holder);
+    cardBrowser(holder, d);
+    return;
+  }
   if (!e.target.closest('[data-back]')) return;
   $('#set-detail').hidden = true;
   $('#sets-list').hidden = false;
@@ -829,7 +856,7 @@ function pfSave(body) {
   PF.inflight++;
   PF.queue = PF.queue
     .then(() => api('portfolio', body))
-    .then((d) => { if (--PF.inflight === 0) { PF.data = d; renderProfile(); renderPickCounts(); } })
+    .then((d) => { if (--PF.inflight === 0) { PF.data = d; renderProfile(); } })
     .catch((e) => { PF.inflight--; toast(e.message, true); return loadPortfolio(); });
   return PF.queue;
 }
@@ -875,6 +902,7 @@ function renderProfile() {
 
   renderPfChart();
   renderPfTable();
+  renderOwned();
 }
 
 // osa: „12 400 Kč“, u velkých částek zkráceně „1,2 mil.“
@@ -1093,63 +1121,13 @@ async function pickSet(id) {
   }
 }
 
-const ownedQty = (kind, refId) => PF.data.items.filter((i) => i.kind === kind && i.refId === refId).reduce((s, i) => s + i.qty, 0);
+const ownedQty = (kind, refId) => (PF.data ? PF.data.items.filter((i) => i.kind === kind && i.refId === refId).reduce((s, i) => s + i.qty, 0) : 0);
 
 function renderPickSet() {
-  const d = PF.pick;
-  $('#pk-title').textContent = `Přidat do sbírky: ${d.name}`;
-  $('#pk-set').innerHTML = `
-    <div class="pk-tools">
-      <button class="btn btn-sm" data-pk-back>← Jiná edice</button>
-      <input id="pk-filter" type="search" placeholder="Filtrovat podle jména nebo čísla" aria-label="Filtrovat karty">
-      <label class="check"><input type="checkbox" id="pk-mine"> Jen co mám</label>
-    </div>
-    <p class="hint">Klik na kartu přidá jeden kus (raw). Stav (PSA 9 / PSA 10), počet a nákupní cenu upravíš pak v tabulce sbírky.</p>
-    <div class="pk-grid" id="pk-grid"></div>
-    ${d.products.length ? `<h3 class="sub">Zapečetěné produkty</h3><ul class="pk-prods" id="pk-prods"></ul>` : ''}
-    <div class="pk-foot"><button class="btn" data-pk-done>Hotovo</button></div>`;
-  renderPickGrid();
+  $('#pk-title').textContent = `Přidat do sbírky: ${PF.pick.name}`;
+  cardBrowser($('#pk-set'), PF.pick, { back: true, done: true });
 }
 
-function renderPickGrid() {
-  const d = PF.pick;
-  const q = norm($('#pk-filter').value.trim()), mineOnly = $('#pk-mine').checked;
-  const ok = (name, num, kind, id) => (!q || norm(name).includes(q) || String(num ?? '') === q) && (!mineOnly || ownedQty(kind, id));
-  const cards = d.cards.filter((c) => ok(c.name, c.num, 'card', c.id));
-  $('#pk-grid').innerHTML = cards.map((c) => `
-    <div class="pk-card" data-card="${c.id}">
-      <button class="pk-art" data-add aria-label="Přidat ${esc(c.name)} #${esc(c.num)}">
-        ${c.img ? `<img src="${safeUrl(c.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<span class="pk-qty"></span>
-      </button>
-      <b title="${esc(c.name)}">${esc(c.name)}</b>
-      <div class="pk-row"><small>#${esc(c.num)}</small><span class="num">${c.raw == null ? '—' : price(pfKc(c.raw))}</span>
-        <button class="pk-minus" data-minus aria-label="Odebrat jeden kus ${esc(c.name)}">−</button></div>
-    </div>`).join('') || `<p class="empty">Žádná karta neodpovídá filtru.</p>`;
-  if ($('#pk-prods')) {
-    $('#pk-prods').innerHTML = d.products.filter((p) => ok(p.name, null, 'product', p.id)).map((p) => `
-      <li data-prod="${p.id}">
-        ${img(p.img, 'thumb', p.name)}
-        <div><b>${esc(p.name)}</b><span class="meta num">${price(pfKc(p.usd))}</span></div>
-        <span class="pk-qty"></span>
-        <button class="btn btn-sm pk-minus" data-minus aria-label="Odebrat jeden kus ${esc(p.name)}">−</button>
-        <button class="btn btn-sm" data-add>Přidat</button>
-      </li>`).join('') || `<li class="empty">Nic neodpovídá filtru.</li>`;
-  }
-  renderPickCounts();
-}
-
-// jen počty kusů — mřížka se nepřekresluje, aby neposkakovala a nenačítala obrázky znovu
-function renderPickCounts() {
-  if (!PF.pick || $('#pk-set').hidden) return;
-  $$('#pk-set [data-card], #pk-set [data-prod]').forEach((el) => {
-    const n = el.dataset.card ? ownedQty('card', Number(el.dataset.card)) : ownedQty('product', Number(el.dataset.prod));
-    el.classList.toggle('own', n > 0);
-    el.querySelector('.pk-qty').textContent = n ? `×${n}` : '';
-    el.querySelector('[data-minus]').hidden = !n;
-  });
-}
-
-$('#pk-set').addEventListener('input', (e) => { if (e.target.id === 'pk-filter' || e.target.id === 'pk-mine') renderPickGrid(); });
 $('#pk-set').addEventListener('click', (e) => {
   if (e.target.closest('[data-pk-back]')) {
     PF.pick = null;
@@ -1159,22 +1137,108 @@ $('#pk-set').addEventListener('click', (e) => {
     renderPickSets();
     return;
   }
-  if (e.target.closest('[data-pk-done]')) { $('#pf-picker').hidden = true; return; }
-  const btn = e.target.closest('[data-add], [data-minus]');
-  const el = btn?.closest('[data-card], [data-prod]');
-  if (!el) return;
-  const kind = el.dataset.card ? 'card' : 'product';
-  const refId = Number(el.dataset.card || el.dataset.prod);
-  const ref = kind === 'card' ? PF.pick.cards.find((c) => c.id === refId) : PF.pick.products.find((p) => p.id === refId);
+  if (e.target.closest('[data-pk-done]')) $('#pf-picker').hidden = true;
+});
+
+// ---- sbírka odkudkoli: Edice, Přehled i výběr v profilu ----
+// Každé místo, které ukazuje kartu nebo produkt, si ho zaregistruje (REFS) a vykreslí tlačítka
+// [data-collect="add|minus"] uvnitř prvku [data-own="kind:id"]. Klik obslouží jeden společný handler,
+// počty kusů se pak překreslí všude najednou (renderOwned).
+const REFS = new Map();
+function regRef(kind, set, r, usd) {
+  REFS.set(`${kind}:${r.id}`, { kind, refId: r.id, setId: set.id, setName: set.name, fetchedAt: set.fetchedAt || null, name: r.name, num: r.num || null, img: r.img || null, usd: usd ?? null });
+}
+const collectBtns = (kind, id, name) => `
+  <span class="pk-qty"></span>
+  <button class="pk-minus" data-collect="minus" data-kind="${kind}" data-ref="${id}" aria-label="Odebrat jeden kus ${esc(name)}" hidden>−</button>`;
+
+// Karta s obrázkem a tlačítkem „+“ (Přehled, nejdražší karty v Edicích).
+function collectCard(set, c, { rank = null, sub = '', rate = null } = {}) {
+  const can = c.id != null;
+  if (can) regRef('card', set, c, c.raw);
+  return `
+    <div class="pcard" ${can ? `data-own="card:${c.id}"` : ''}>
+      <div class="img">${rank ? `<span class="rank">#${rank}</span>` : ''}${c.img ? `<img src="${safeUrl(c.img)}" alt="${esc(c.name)}" loading="lazy" referrerpolicy="no-referrer">` : ''}
+        ${can ? `<button class="pc-add" data-collect="add" data-kind="card" data-ref="${c.id}" aria-label="Přidat ${esc(c.name)} do sbírky">+</button>` : ''}</div>
+      <b>${esc(c.name)}</b>
+      <div class="price-row"><span class="num mono">${c.raw == null || !rate ? '—' : price(c.raw * rate)}</span>${can ? collectBtns('card', c.id, c.name) : ''}</div>
+      ${sub ? `<small>${sub}</small>` : ''}
+    </div>`;
+}
+
+// Všechny karty a produkty edice s filtrem (výběr v profilu i detail edice).
+function cardBrowser(box, d, { back = false, done = false } = {}) {
+  for (const c of d.cards) regRef('card', d, c, c.raw);
+  for (const p of d.products) if (p.id != null) regRef('product', d, p, p.usd);
+  const kc2 = (usd) => price(usd == null || !d.usdCzk ? null : usd * d.usdCzk);
+  box.innerHTML = `
+    <div class="pk-tools">
+      ${back ? '<button class="btn btn-sm" data-pk-back>← Jiná edice</button>' : ''}
+      <input class="cb-filter" type="search" placeholder="Filtrovat podle jména nebo čísla" aria-label="Filtrovat karty">
+      <label class="check"><input type="checkbox" class="cb-mine"> Jen co mám</label>
+    </div>
+    <p class="hint">Klik na kartu přidá jeden kus (raw). Stav (PSA 9 / PSA 10), počet a nákupní cenu upravíš pak v tabulce sbírky v profilu.</p>
+    <div class="pk-grid"></div>
+    ${d.products.length ? '<h3 class="sub">Zapečetěné produkty</h3><ul class="pk-prods"></ul>' : ''}
+    ${done ? '<div class="pk-foot"><button class="btn" data-pk-done>Hotovo</button></div>' : ''}`;
+  const draw = () => {
+    const q = norm($('.cb-filter', box).value.trim()), mineOnly = $('.cb-mine', box).checked;
+    const ok = (name, num, kind, id) => (!q || norm(name).includes(q) || String(num ?? '') === q) && (!mineOnly || ownedQty(kind, id));
+    $('.pk-grid', box).innerHTML = d.cards.filter((c) => ok(c.name, c.num, 'card', c.id)).map((c) => `
+      <div class="pk-card" data-own="card:${c.id}">
+        <button class="pk-art" data-collect="add" data-kind="card" data-ref="${c.id}" aria-label="Přidat ${esc(c.name)} #${esc(c.num)}">
+          ${c.img ? `<img src="${safeUrl(c.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<span class="pk-qty"></span>
+        </button>
+        <b title="${esc(c.name)}">${esc(c.name)}</b>
+        <div class="pk-row"><small>#${esc(c.num)}</small><span class="num">${kc2(c.raw)}</span>
+          <button class="pk-minus" data-collect="minus" data-kind="card" data-ref="${c.id}" aria-label="Odebrat jeden kus ${esc(c.name)}" hidden>−</button></div>
+      </div>`).join('') || '<p class="empty">Žádná karta neodpovídá filtru.</p>';
+    const prods = $('.pk-prods', box);
+    if (prods) {
+      prods.innerHTML = d.products.filter((p) => p.id != null && ok(p.name, null, 'product', p.id)).map((p) => `
+        <li data-own="product:${p.id}">
+          ${img(p.img, 'thumb', p.name)}
+          <div><b>${esc(p.name)}</b><span class="meta num">${kc2(p.usd)}</span></div>
+          ${collectBtns('product', p.id, p.name)}
+          <button class="btn btn-sm" data-collect="add" data-kind="product" data-ref="${p.id}">Přidat</button>
+        </li>`).join('') || '<li class="empty">Nic neodpovídá filtru.</li>';
+    }
+    renderOwned();
+  };
+  $('.cb-filter', box).addEventListener('input', draw);
+  $('.cb-mine', box).addEventListener('change', draw);
+  draw();
+}
+
+// počty kusů všude, kde se karta nebo produkt ukazuje (mřížky se nepřekreslují, aby neposkakovaly)
+function renderOwned() {
+  $$('[data-own]').forEach((el) => {
+    const [kind, id] = el.dataset.own.split(':');
+    const n = ownedQty(kind, Number(id));
+    el.classList.toggle('own', n > 0);
+    const q = $('.pk-qty', el);
+    if (q) q.textContent = n ? `×${n}` : '';
+    $$('[data-collect="minus"]', el).forEach((b) => (b.hidden = !n));
+  });
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-collect]');
+  if (!b) return;
+  e.preventDefault();
+  if (!PF.data) { toast('Sbírka se ještě načítá, zkus to za chvilku.', true); return; }
+  const kind = b.dataset.kind, refId = Number(b.dataset.ref);
+  const ref = REFS.get(`${kind}:${refId}`);
+  if (!ref) return;
   const items = PF.data.items;
-  if (btn.hasAttribute('data-add')) {
+  if (b.dataset.collect === 'add') {
     const id = kind === 'card' ? `c:${refId}:raw` : `p:${refId}`;
     const it = items.find((i) => i.id === id);
-    const usd = kind === 'card' ? ref.raw : ref.usd;
     if (it) it.qty++;
-    else items.push({ id, kind, refId, grade: kind === 'card' ? 'raw' : null, qty: 1, setId: PF.pick.id, setName: PF.pick.name, name: ref.name, num: ref.num || null, img: ref.img || null, buyPrice: null, addedAt: new Date().toISOString(), addedUsd: usd, usd, pricedAt: PF.pick.fetchedAt, hist: [] });
-    pfSave({ action: 'add', kind, setId: PF.pick.id, refId });
-    if (motion()) gsap.fromTo(el.querySelector('.pk-qty'), { scale: 1.5 }, { scale: 1, duration: 0.35, ease: 'back.out(3)' });
+    else items.push({ id, kind, refId, grade: kind === 'card' ? 'raw' : null, qty: 1, setId: ref.setId, setName: ref.setName, name: ref.name, num: ref.num, img: ref.img, buyPrice: null, addedAt: new Date().toISOString(), addedUsd: ref.usd, usd: ref.usd, pricedAt: ref.fetchedAt, hist: [] });
+    pfSave({ action: 'add', kind, setId: ref.setId, refId });
+    // mimo výběr v profilu potvrdit, že se to opravdu uložilo do sbírky
+    if (!b.closest('#pf-picker')) toast(`Ve sbírce: ${ref.name} (${ownedQty(kind, refId)} ks)`);
   } else {
     // ubírá se nejdřív raw kus, pak ostatní stavy
     const it = items.find((i) => i.id === `c:${refId}:raw`) || items.find((i) => i.kind === kind && i.refId === refId);
@@ -1183,8 +1247,10 @@ $('#pk-set').addEventListener('click', (e) => {
     if (it.qty <= 0) PF.data.items = items.filter((i) => i !== it);
     pfSave({ action: 'update', id: it.id, qty: Math.max(0, it.qty) });
   }
-  renderPickCounts();
+  renderOwned();
   renderProfile();
+  const badge = $('.pk-qty', b.closest('[data-own]') || b);
+  if (badge && motion()) gsap.fromTo(badge, { scale: 1.5 }, { scale: 1, duration: 0.35, ease: 'back.out(3)' });
 });
 
 // ---------- kalendář ----------
@@ -1327,6 +1393,78 @@ $('#run-stock').addEventListener('click', (e) => busy(e.target, async () => {
 
 $('#refresh').addEventListener('click', (e) => busy(e.target, load));
 
+// ---------- hledání v horní liště ----------
+// Edice (ze souhrnu PokeData) a produkty z českých obchodů. Enter bez výběru = Trh CZ s tímhle dotazem.
+const Q = { items: [], sel: -1 };
+function searchItems(q) {
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const match = (name) => { const n = norm(name); return words.every((w) => n.includes(w) || (w === 'etb' && n.includes('elite trainer'))); };
+  const sets = (SETS.data?.sets || []).filter((s) => match(s.name) || norm(s.code) === norm(q)).slice(0, 4).map((s) => ({
+    img: s.logo, cls: 'logo', label: s.name, meta: `edice · ${s.language === 'JP' ? 'japonská' : 'anglická'} · ${fmtDate(s.releaseDate)}`,
+    go: () => { setView('sets'); openSet(s.id); },
+  }));
+  const prods = (S?.groups || []).filter((g) => match(g.name))
+    .sort((a, b) => (!!b.cheapest - !!a.cheapest) || (a.cheapest?.price ?? 1e9) - (b.cheapest?.price ?? 1e9))
+    .slice(0, 6).map((g) => ({
+      img: g.image, cls: 'thumb', label: g.name,
+      meta: g.cheapest ? `nejlevněji ${price(g.cheapest.price)} · ${g.cheapest.shop}` : `${g.total} ${g.total === 1 ? 'nabídka' : 'nabídek'} · nikde skladem`,
+      go: () => goMarket(g.name),
+    }));
+  return [...sets, ...prods];
+}
+function goMarket(q) {
+  setView('market');
+  $('#m-search').value = q;
+  renderMarket();
+  toTop();
+}
+function renderSearch() {
+  const box = $('#q-results'), q = $('#q').value.trim();
+  Q.items = searchItems(q);
+  Q.sel = -1;
+  const open = q.length > 1;
+  box.hidden = !open;
+  $('#q').setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  box.innerHTML = Q.items.map((it, i) => `
+    <button class="q-item" role="option" data-i="${i}" id="q-opt-${i}">
+      ${it.img ? `<img class="${it.cls}" src="${safeUrl(it.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="thumb thumb-empty">◓</span>'}
+      <span><b>${esc(it.label)}</b><small>${esc(it.meta)}</small></span>
+    </button>`).join('') + `<button class="q-item q-all" role="option" data-all>Hledat „${esc(q)}“ ve všech obchodech →</button>`;
+}
+function closeSearch() { $('#q-results').hidden = true; $('#q').setAttribute('aria-expanded', 'false'); }
+// po výběru výsledku pole vyprázdnit (dotaz zůstane ve filtru Trhu CZ)
+function pickedSearch() { closeSearch(); $('#q').value = ''; $('#q').blur(); }
+$('#q').addEventListener('input', renderSearch);
+$('#q').addEventListener('focus', renderSearch);
+$('#q').addEventListener('keydown', (e) => {
+  const opts = $$('#q-results .q-item');
+  if (e.key === 'Escape') { closeSearch(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!opts.length) return;
+    Q.sel = (Q.sel + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length;
+    opts.forEach((o, i) => o.classList.toggle('sel', i === Q.sel));
+    $('#q').setAttribute('aria-activedescendant', opts[Q.sel].id || '');
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const o = opts[Q.sel];
+    if (o && o.dataset.i != null) Q.items[o.dataset.i].go(); else if ($('#q').value.trim()) goMarket($('#q').value.trim());
+    pickedSearch();
+  }
+});
+// pointerdown místo click: výsledek se vybere dřív, než input ztratí fokus a seznam zavře
+$('#q-results').addEventListener('pointerdown', (e) => {
+  const o = e.target.closest('.q-item');
+  if (!o) return;
+  e.preventDefault();
+  if (o.dataset.i != null) Q.items[o.dataset.i].go(); else goMarket($('#q').value.trim());
+  pickedSearch();
+});
+$('#q').addEventListener('blur', () => setTimeout(closeSearch, 120));
+
 // ---------- úvod ----------
 // Pokéball spadne, kymácí se (jako při chytání), dokud se načítají data, pak cvakne a otevře se.
 // Je to zároveň indikátor načítání: krátké načtení = krátký úvod. Klik nebo klávesa ho přeskočí.
@@ -1388,6 +1526,7 @@ async function start() {
   try { v = localStorage.getItem('ph_view') || v; } catch {}
   const intro = playIntro();
   loadPortfolio().catch(() => {}); // jméno a hodnota sbírky do horní lišty
+  loadSets().catch(() => {}); // nejcennější karty na Přehledu a edice ve hledání
   try { await load(); } catch (e) { toast(e.message, true); }
   await intro.finish();
   setView(v);
