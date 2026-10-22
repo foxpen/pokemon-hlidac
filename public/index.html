@@ -152,7 +152,14 @@
           <div id="pk-set" hidden></div>
         </div>
 
-        <div class="panel">
+        <div class="empty-state pf-empty" id="pf-empty" hidden>
+          <div class="ball" aria-hidden="true"></div>
+          <h3>Sbírka je prázdná</h3>
+          <p>Vyber edici a naklikej karty, které máš. Přidat jdou i zapečetěné produkty (boxy, ETB, balíčky). Pak tu uvidíš, kolik má sbírka hodnotu a jak se jí vede.</p>
+          <button class="btn btn-primary" data-pf-add>Přidat do sbírky</button>
+        </div>
+
+        <div class="panel" id="pf-chart-panel">
           <div class="panel-head">
             <h2>Vývoj hodnoty sbírky</h2>
             <div class="seg" role="group" aria-label="Období grafu" id="pf-period">
@@ -166,7 +173,7 @@
           <p class="hint" id="pf-chart-note"></p>
         </div>
 
-        <div class="panel mt">
+        <div class="panel mt" id="pf-table-panel">
           <div class="panel-head">
             <h2>Moje karty a produkty</h2>
             <select id="pf-sort" class="select-sm" aria-label="Řazení sbírky">
@@ -276,7 +283,7 @@
 
       <!-- NASTAVENÍ -->
       <section data-view="settings" hidden>
-        <div class="grid-2">
+        <div class="grid-2 settings-grid">
           <div class="panel">
             <h2>Notifikace</h2>
             <div id="channels" class="channels"></div>
