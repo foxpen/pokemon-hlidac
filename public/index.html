@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Pokémon hlídač</title>
   <meta name="description" content="Novinky, předprodeje, sklad a ceny Pokémon TCG v českých obchodech.">
   <meta name="theme-color" content="#07080b">
@@ -32,42 +32,64 @@
     <div class="intro-status" id="intro-status">Načítám trh…</div>
   </div>
 
-  <!-- Aplikace -->
-  <div id="app">
-    <header class="topbar">
-      <div class="brand"><span class="ball" aria-hidden="true"></span> Pokémon hlídač</div>
-      <nav class="tabs" id="tabs" aria-label="Sekce">
-        <button data-view="overview" class="active">Přehled</button>
-        <button data-view="watch">Hlídám</button>
-        <button data-view="market">Trh CZ</button>
-        <button data-view="sets">Edice</button>
-        <button data-view="calendar">Kalendář</button>
-        <button data-view="news">Novinky</button>
-        <button data-view="settings">Nastavení</button>
+  <!-- ilustrace na pozadí (nahoře viditelná, dolů přechází do tmavé) -->
+  <div class="bg-art" aria-hidden="true"></div>
+
+  <!-- Aplikace: levé menu (desktop), lišta s hledáním, menu dole (mobil) -->
+  <div class="shell" id="app">
+    <aside class="side">
+      <div class="brand side-brand"><span class="ball" aria-hidden="true"></span><span>Pokémon <b>hlídač</b></span></div>
+      <nav class="side-nav" id="tabs" aria-label="Sekce">
+        <button class="nav-btn active" data-view="overview"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Přehled</span></button>
+        <button class="nav-btn" data-view="watch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Hlídám</span></button>
+        <button class="nav-btn" data-view="market"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18l-1.5 11h-15z"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/></svg><span>Trh CZ</span></button>
+        <button class="nav-btn" data-view="sets"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3" width="12" height="16" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h9"/></svg><span>Edice</span></button>
+        <button class="nav-btn" data-view="calendar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Kalendář</span></button>
+        <button class="nav-btn" data-view="news"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v10a2 2 0 0 1-2 2M8 9h5M8 13h5M8 17h3"/></svg><span>Novinky</span></button>
+        <span class="side-sep"></span>
+        <button class="nav-btn" data-view="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Nastavení</span></button>
       </nav>
-      <div class="top-actions">
-        <button class="btn btn-ghost btn-sm" id="refresh" aria-label="Načíst znovu" title="Načíst znovu">↻</button>
-        <button class="me" id="me" data-view="profile" aria-label="Můj profil">
-          <span class="me-avatar" id="me-avatar" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-          </span>
-          <span class="me-text"><b id="me-name">Můj profil</b><small id="me-value">sbírka</small></span>
-        </button>
-      </div>
-    </header>
+      <p class="side-tag">Novinky, sklad a ceny Pokémon TCG v&nbsp;českých obchodech na jednom místě.</p>
+    </aside>
+
+    <div class="main-col">
+      <header class="topbar">
+        <div class="brand top-brand"><span class="ball" aria-hidden="true"></span> Pokémon hlídač</div>
+        <div class="search" id="search">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="Hledej produkty a edice, třeba „pitch black etb“" aria-label="Hledat produkty a edice" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="q-results">
+          <div class="q-results" id="q-results" role="listbox" hidden></div>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-ghost btn-sm" id="refresh" aria-label="Načíst znovu" title="Načíst znovu">↻</button>
+          <button class="me" id="me" data-view="profile" aria-label="Můj profil">
+            <span class="me-avatar" id="me-avatar" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+            </span>
+            <span class="me-text"><b id="me-name">Můj profil</b><small id="me-value">sbírka</small></span>
+          </button>
+        </div>
+      </header>
 
     <main class="content" id="main">
       <!-- PŘEHLED -->
       <section data-view="overview">
-        <div class="ov-hero">
-          <h1>Dnes na českém trhu</h1>
-          <p class="muted" id="ov-sub">Načítám…</p>
-        </div>
-        <div class="stats" id="stats">
-          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
-          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
-          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
-          <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+        <div class="hero">
+          <div class="hero-text">
+            <span class="eyebrow">Pokémon TCG v Česku</span>
+            <h1>Dnes na českém trhu</h1>
+            <p id="ov-sub">Načítám…</p>
+            <div class="hero-cta">
+              <button class="btn btn-primary" data-go="market">Projít trh</button>
+              <button class="btn btn-glass" data-go="profile">Moje sbírka</button>
+            </div>
+          </div>
+          <div class="stats" id="stats">
+            <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+            <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+            <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+            <div class="stat"><div class="sk sk-num"></div><div class="sk sk-line"></div></div>
+          </div>
         </div>
 
         <div class="ov-grid">
@@ -86,16 +108,27 @@
             <ul class="mini-list" id="announced"></ul>
           </article>
 
+          <article class="panel ov-chase">
+            <div class="panel-head"><h2>Nejcennější karty nových edic</h2><button class="link-more" data-go="sets">Edice →</button></div>
+            <p class="panel-note">Nejdražší karta z každé nové anglické edice (cena raw, trh USA). Plusem ji přidáš do sbírky.</p>
+            <div class="strip" id="chase"></div>
+          </article>
+
+          <article class="panel ov-selling">
+            <div class="panel-head"><h2>Právě v prodeji</h2><button class="link-more" data-go="market">Trh CZ →</button></div>
+            <p class="panel-note">Nově přidané a znovu naskladněné produkty, u každého nejlevnější obchod.</p>
+            <div class="strip" id="selling"></div>
+          </article>
+
           <article class="panel ov-hot">
             <div class="panel-head"><h2>Co letí</h2><button class="link-more" data-go="market">Trh CZ →</button></div>
             <p class="panel-note">Produkty, které mizí z obchodů: vyprodané ve většině obchodů nebo vyprodané v posledních dnech.</p>
             <ul class="hot-list" id="hot"></ul>
           </article>
 
-          <article class="panel ov-selling">
-            <div class="panel-head"><h2>Právě v prodeji</h2><button class="link-more" data-go="market">Trh CZ →</button></div>
-            <p class="panel-note">Nově přidané a znovu naskladněné produkty, u každého nejlevnější obchod.</p>
-            <ul class="sell-list" id="selling"></ul>
+          <article class="panel ov-watch">
+            <div class="panel-head"><h2>Tvoje hlídané</h2><button class="link-more" data-go="watch">Hlídám →</button></div>
+            <ul class="mini-list" id="ov-watch"></ul>
           </article>
 
           <article class="panel ov-feed">
@@ -117,11 +150,6 @@
               <li><div class="sk thumb"></div><div><div class="sk sk-line" style="width:30%"></div><div class="sk sk-line"></div></div><span></span></li>
               <li><div class="sk thumb"></div><div><div class="sk sk-line" style="width:45%"></div><div class="sk sk-line"></div></div><span></span></li>
             </ul>
-          </article>
-
-          <article class="panel ov-watch">
-            <div class="panel-head"><h2>Tvoje hlídané</h2><button class="link-more" data-go="watch">Hlídám →</button></div>
-            <ul class="mini-list" id="ov-watch"></ul>
           </article>
         </div>
       </section>
@@ -145,7 +173,7 @@
 
       <!-- MŮJ PROFIL: sbírka a její hodnota -->
       <section data-view="profile" hidden>
-        <div class="pf-hero">
+        <div class="pf-hero banner">
           <span class="me-avatar pf-avatar" id="pf-avatar" aria-hidden="true"></span>
           <div class="grow">
             <h1 id="pf-name">Trenér</h1>
@@ -346,6 +374,21 @@
         </div>
       </section>
     </main>
+    </div>
+  </div>
+
+  <!-- mobil: spodní menu (max 5 položek), zbytek pod „Více“ -->
+  <nav class="bottom-nav" id="bnav" aria-label="Sekce">
+    <button class="nav-btn active" data-view="overview"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Přehled</span></button>
+    <button class="nav-btn" data-view="watch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Hlídám</span></button>
+    <button class="nav-btn" data-view="market"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18l-1.5 11h-15z"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/></svg><span>Trh</span></button>
+    <button class="nav-btn" data-view="sets"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3" width="12" height="16" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h9"/></svg><span>Edice</span></button>
+    <button class="nav-btn" id="more-btn" aria-expanded="false" aria-controls="more-sheet"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>Více</span></button>
+  </nav>
+  <div class="more-sheet" id="more-sheet" hidden>
+    <button class="nav-btn" data-view="calendar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Kalendář</span></button>
+    <button class="nav-btn" data-view="news"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v10a2 2 0 0 1-2 2M8 9h5M8 13h5M8 17h3"/></svg><span>Novinky</span></button>
+    <button class="nav-btn" data-view="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Nastavení</span></button>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

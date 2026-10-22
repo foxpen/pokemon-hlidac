@@ -118,7 +118,7 @@ const summarize = (d) => ({
   id: d.id, v: d.v, name: d.name, code: d.code, language: d.language, series: d.series, releaseDate: d.releaseDate,
   logo: d.logo, symbol: d.symbol, fetchedAt: d.fetchedAt || null,
   cardCount: d.cardCount ?? null, setValue: d.setValue ?? null, top10: d.top10 ?? null,
-  chase: d.top?.[0] ? { name: d.top[0].name, raw: d.top[0].raw, psa10: d.top[0].psa10, img: d.top[0].img } : null,
+  chase: d.top?.[0] ? { id: d.top[0].id ?? null, num: d.top[0].num ?? null, name: d.top[0].name, raw: d.top[0].raw, psa10: d.top[0].psa10, img: d.top[0].img } : null,
   topImgs: (d.top || []).slice(0, 3).map((c) => c.img),
   boxUsd: d.boxUsd ?? null, etbUsd: d.etbUsd ?? null, bundleUsd: d.bundleUsd ?? null, packUsd: d.packUsd ?? null,
 });
