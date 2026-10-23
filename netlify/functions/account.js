@@ -1,12 +1,13 @@
-// GET — přihlášený účet a seznam účtů; POST {action: password|add|reset|remove} — správa účtů v Nastavení.
+// GET — přihlášený účet, seznam účtů a platné pozvánky; POST {action: password|add|reset|remove|invite|revoke}.
 // Kdo zapomene heslo, tomu ho nastaví jiný přihlášený účet (reset).
 import { endpoint, json } from './_lib/http-response.js';
-import { listUsers, getUser, saveUser, removeUser, checkPassword, normName, validName, validPassword, clearFails, sessionCookie } from './_lib/auth.js';
+import { listUsers, getUser, saveUser, removeUser, checkPassword, normName, validName, validPassword, clearFails, sessionCookie,
+  createInvite, listInvites, removeInvite } from './_lib/auth.js';
 
 const SHORT = 'Heslo musí mít aspoň 8 znaků';
 
 export default endpoint(async (req, ctx, me) => {
-  if (req.method === 'GET') return json({ user: me, users: await listUsers() });
+  if (req.method === 'GET') return json({ user: me, users: await listUsers(), invites: await listInvites() });
 
   const body = await req.json().catch(() => ({}));
   const name = normName(body.user);
@@ -42,6 +43,16 @@ export default endpoint(async (req, ctx, me) => {
     if (!(await getUser(name))) return json({ error: 'Účet nenalezen' }, 404);
     await removeUser(name);
     return json({ ok: true, users: await listUsers() });
+  }
+
+  if (body.action === 'invite') {
+    const invite = await createInvite(me);
+    return json({ ok: true, invite, invites: await listInvites() });
+  }
+
+  if (body.action === 'revoke') {
+    await removeInvite(body.code);
+    return json({ ok: true, invites: await listInvites() });
   }
 
   return json({ error: 'Neznámá akce' }, 400);

@@ -33,25 +33,52 @@
   </div>
 
   <!-- Přihlášení: ilustrace se pomalu přibližuje, plují světlušky, skleněná karta s pokéballem.
-       Při úplně prvním spuštění se tu zakládá první účet (další v Nastavení). -->
+       Karta má tři stránky: výběr, přihlášení a vytvoření účtu (s kódem pozvánky; první účet bez kódu). -->
   <div class="login" id="login" hidden>
     <div class="login-bg" aria-hidden="true"></div>
     <div class="login-flies" id="login-flies" aria-hidden="true"></div>
     <div class="login-brand"><span class="ball" aria-hidden="true"></span><span>Pokémon <span class="script">Hlídka</span></span></div>
-    <form class="login-card" id="login-form" novalidate>
+    <div class="login-card" id="login-card">
       <div class="login-ball" aria-hidden="true">
         <div class="intro-ball"><span class="ib-top"></span><span class="ib-bottom"></span><span class="ib-btn"></span><span class="ib-flash"></span></div>
       </div>
-      <h1 class="script" id="login-title">Vítej zpět, trenére!</h1>
-      <p class="login-sub" id="login-sub">Přihlas se a měj přehled o novinkách, cenách a své sbírce.</p>
-      <label class="lf"><span class="sr">Uživatelské jméno</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><input name="user" autocomplete="username" placeholder="Uživatelské jméno" autocapitalize="none" spellcheck="false" required></label>
-      <label class="lf"><span class="sr">Heslo</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><input name="password" type="password" autocomplete="current-password" placeholder="Heslo" required><button type="button" class="lf-eye" aria-label="Zobrazit heslo" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></label>
-      <label class="lf" id="login-pw2" hidden><span class="sr">Heslo znovu</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><input name="password2" type="password" autocomplete="new-password" placeholder="Heslo znovu"></label>
-      <label class="check login-remember"><input type="checkbox" name="remember" checked> Zapamatovat si mě</label>
-      <p class="login-err" id="login-err" role="alert"></p>
-      <button class="btn btn-primary login-go" type="submit"><span id="login-go-text">Přihlásit se</span> <span aria-hidden="true">→</span></button>
-    </form>
-    <p class="login-foot">Soukromá hlídka · nové trenéry přidáš po přihlášení v Nastavení</p>
+      <div class="lp-sparks" aria-hidden="true"></div>
+      <span class="lp-flash" aria-hidden="true"></span>
+
+      <section class="lp" data-pane="choose" hidden>
+        <h1 class="script">Vítej, trenére!</h1>
+        <p class="login-sub">Hlídka sleduje český trh s Pokémon kartami. Přihlas se, nebo se přidej s kódem pozvánky.</p>
+        <div class="lp-choices">
+          <button type="button" class="btn btn-primary login-go" data-pane-go="login">Přihlásit se <span aria-hidden="true">→</span></button>
+          <button type="button" class="btn btn-glass login-go" data-pane-go="register">Vytvořit účet</button>
+        </div>
+      </section>
+
+      <form class="lp" data-pane="login" hidden novalidate>
+        <button type="button" class="lp-back" data-pane-go="choose"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Zpět</span></button>
+        <h1 class="script">Vítej zpět, trenére!</h1>
+        <p class="login-sub">Přihlas se a hlídej s námi novinky, ceny a svou sbírku.</p>
+        <label class="lf"><span class="sr">Uživatelské jméno</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><input name="user" type="text" autocomplete="username" placeholder="Uživatelské jméno" autocapitalize="none" spellcheck="false" required></label>
+        <label class="lf"><span class="sr">Heslo</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><input name="password" type="password" autocomplete="current-password" placeholder="Heslo" required><button type="button" class="lf-eye" aria-label="Zobrazit heslo" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></label>
+        <label class="check login-remember"><input type="checkbox" name="remember" checked> Zapamatovat si mě</label>
+        <p class="login-err" role="alert"></p>
+        <button class="btn btn-primary login-go" type="submit">Přihlásit se <span aria-hidden="true">→</span></button>
+      </form>
+
+      <form class="lp" data-pane="register" hidden novalidate>
+        <button type="button" class="lp-back" data-pane-go="choose"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Zpět</span></button>
+        <h1 class="script" data-reg-title>Přidej se k hlídce!</h1>
+        <p class="login-sub" data-reg-sub>Účet založíš s kódem pozvánky od někoho z hlídky.</p>
+        <label class="lf"><span class="sr">Kód pozvánky (PIKA-XXXX-XXXX)</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg><input name="code" type="text" autocomplete="off" placeholder="Kód pozvánky (PIKA-XXXX-XXXX)" autocapitalize="characters" spellcheck="false"></label>
+        <label class="lf"><span class="sr">Uživatelské jméno</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><input name="user" type="text" autocomplete="username" placeholder="Uživatelské jméno" autocapitalize="none" spellcheck="false" required></label>
+        <label class="lf"><span class="sr">Heslo (aspoň 8 znaků)</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><input name="password" type="password" autocomplete="new-password" placeholder="Heslo (aspoň 8 znaků)" required><button type="button" class="lf-eye" aria-label="Zobrazit heslo" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></label>
+        <label class="lf"><span class="sr">Heslo znovu</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><input name="password2" type="password" autocomplete="new-password" placeholder="Heslo znovu" required></label>
+        <label class="check login-remember"><input type="checkbox" name="remember" checked> Zapamatovat si mě</label>
+        <p class="login-err" role="alert"></p>
+        <button class="btn btn-primary login-go" type="submit">Vytvořit účet <span aria-hidden="true">→</span></button>
+      </form>
+    </div>
+    <p class="login-foot">Soukromá hlídka · kód pozvánky vytvoříš po přihlášení v Nastavení</p>
   </div>
 
   <!-- ilustrace na pozadí (nahoře viditelná, dolů přechází do tmavé) -->
@@ -399,6 +426,10 @@
               <label class="field"><span>Nové heslo (aspoň 8 znaků)</span><input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
               <button class="btn" type="submit">Změnit heslo</button>
             </form>
+            <h3 class="sub">Pozvánky</h3>
+            <p class="hint">Kód pozvánky pošli kamarádovi. Na přihlašovací obrazovce zvolí „Vytvořit účet“ a kódem si účet založí. Kód platí 7 dní a jde použít jednou.</p>
+            <button class="btn" id="inv-new" type="button">Vytvořit pozvánku</button>
+            <ul class="mini-list inv-list" id="inv-list"></ul>
             <h3 class="sub">Účty</h3>
             <ul class="mini-list acc-list" id="acc-list"></ul>
             <form id="acc-add" class="row mt">

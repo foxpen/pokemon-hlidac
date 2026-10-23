@@ -198,13 +198,14 @@ input::placeholder { color: var(--faint); }
 .script { font-family: 'Caveat', var(--font); font-weight: 700; letter-spacing: 0; }
 body.locked { overflow: hidden; }
 .login {
-  position: fixed; inset: 0; z-index: var(--z-intro); overflow: hidden;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  /* posouvatelné: na nízkém displeji se karta neuřízne (centruje ji margin: auto) */
+  position: fixed; inset: 0; z-index: var(--z-intro); overflow-x: hidden; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 18px;
   padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); background: var(--bg);
 }
 /* ilustrace se pomalu přibližuje (jen transform, běží na kompozitoru) */
 .login-bg {
-  position: absolute; inset: -4%; z-index: -2;
+  position: fixed; inset: -4%; z-index: -2;
   background:
     radial-gradient(70% 80% at 50% 50%, rgba(7, 8, 11, 0), rgba(7, 8, 11, .55)),
     linear-gradient(180deg, rgba(7, 8, 11, .05), rgba(7, 8, 11, .35)),
@@ -213,7 +214,7 @@ body.locked { overflow: hidden; }
 }
 @keyframes login-zoom { from { transform: scale(1); } to { transform: scale(1.09) translate(-1%, -1%); } }
 /* světlušky: pozice, rychlost a velikost nastavuje JS přes proměnné */
-.login-flies { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.login-flies { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
 .login-flies i {
   position: absolute; left: var(--x); top: var(--y); width: var(--s); height: var(--s); border-radius: 50%;
   background: #ffe9a3; box-shadow: 0 0 10px 3px rgba(255, 214, 102, .65); opacity: 0;
@@ -232,7 +233,7 @@ body.locked { overflow: hidden; }
 }
 .login-brand .script { font-size: 30px; color: var(--accent); }
 .login-card {
-  position: relative; width: min(440px, 100%); padding: 22px 30px 28px;
+  position: relative; flex: none; width: min(440px, 100%); margin: auto 0; padding: 22px 30px 28px;
   display: flex; flex-direction: column; gap: 14px; text-align: center;
   background: rgba(14, 18, 28, .52); backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, .16); border-radius: 26px;
@@ -259,10 +260,33 @@ body.locked { overflow: hidden; }
 .login-go { min-height: 52px; border-radius: 999px; font-size: 15px; }
 .login-go:disabled { cursor: progress; }
 .login-foot { margin: 0; color: rgba(236, 236, 241, .62); font-size: 12px; text-shadow: 0 1px 8px rgba(0, 0, 0, .7); }
-.acc-list li { align-items: center; }
+/* stránky karty: výběr / přihlášení / vytvoření účtu */
+.lp { display: flex; flex-direction: column; gap: 14px; }
+.lp-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.lp-back {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin: -6px 0 -10px -8px; padding: 6px 10px 6px 4px;
+  font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; border-radius: 10px; cursor: pointer;
+  transition: color .2s var(--ease), background .2s var(--ease);
+}
+.lp-back:hover { color: var(--text); background: rgba(255, 255, 255, .06); }
+.lp-back .ico { width: 18px; height: 18px; }
+.lp-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.lp-sparks i {
+  position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; opacity: 0;
+  background: #fff7d1; box-shadow: 0 0 14px 4px rgba(242, 194, 48, .8);
+}
+.lp-flash {
+  position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none; opacity: 0; visibility: hidden;
+  background: radial-gradient(60% 50% at 50% 50%, rgba(255, 251, 230, .95), rgba(242, 194, 48, .35) 60%, transparent 85%);
+}
+.acc-list li, .inv-list li { align-items: center; }
+.inv-list .row { gap: 6px; flex-wrap: nowrap; }
+.inv-list .meta { color: var(--muted); font-size: 12px; }
+.inv-list li.fresh b { color: var(--accent); }
 .acc-list .row { gap: 6px; flex-wrap: nowrap; }
 @media (max-width: 767px) {
-  .login { justify-content: flex-end; padding-top: 88px; }
+  .login { padding-top: 88px; }
+  .login-card { margin: auto 0 0; } /* na mobilu karta dole, nad ní ilustrace */
   .login-brand { left: 0; right: 0; justify-content: center; top: 26px; } /* bez transformace, tu přepisuje vstupní animace */
   .login-card { padding: 18px 20px 24px; }
 }

@@ -1,13 +1,14 @@
-// GET — stav přihlášení {authed, user, setup}; POST {action: setup|login|logout}.
-// setup jde jen jednou, když ještě neexistuje žádný účet (pak se další přidávají v Nastavení).
+// GET — stav přihlášení {authed, user, setup}; POST {action: setup|register|login|logout}.
+// setup = první účet, jde jen dokud žádný neexistuje. register = další účty, jen s kódem pozvánky z Nastavení.
 import { endpoint, json } from './_lib/http-response.js';
 import {
   sessionUser, sessionCookie, clearCookie, listUsers, getUser, saveUser, checkPassword,
-  normName, validName, validPassword, lockedMinutes, noteFail, clearFails,
+  normName, validName, validPassword, lockedMinutes, noteFail, clearFails, getInvite, removeInvite,
 } from './_lib/auth.js';
 
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const BAD = 'Špatné jméno nebo heslo';
+const BAD_NAME = 'Jméno musí mít 3–32 znaků: písmena bez diakritiky, čísla, tečka, pomlčka nebo podtržítko';
 
 export default endpoint(async (req) => {
   if (req.method === 'GET') {
@@ -22,10 +23,21 @@ export default endpoint(async (req) => {
 
   if (body.action === 'setup') {
     if ((await listUsers()).length) return json({ error: 'Účet už existuje, přihlas se' }, 409);
-    if (!validName(name)) return json({ error: 'Jméno musí mít 3–32 znaků: písmena bez diakritiky, čísla, tečka, pomlčka nebo podtržítko' }, 400);
+    if (!validName(name)) return json({ error: BAD_NAME }, 400);
     if (!validPassword(body.password)) return json({ error: 'Heslo musí mít aspoň 8 znaků' }, 400);
     const user = await saveUser(name, body.password);
     return json({ ok: true, user: name }, 200, { 'Set-Cookie': await sessionCookie(user, body.remember !== false) });
+  }
+
+  if (body.action === 'register') {
+    const invite = await getInvite(body.code);
+    if (!invite) { await pause(600); return json({ error: 'Neplatný nebo prošlý kód pozvánky' }, 400); }
+    if (!validName(name)) return json({ error: BAD_NAME }, 400);
+    if (await getUser(name)) return json({ error: 'Tohle jméno už má jiný trenér' }, 409);
+    if (!validPassword(body.password)) return json({ error: 'Heslo musí mít aspoň 8 znaků' }, 400);
+    const user = await saveUser(name, body.password);
+    await removeInvite(invite.code); // pozvánka je jednorázová
+    return json({ ok: true, user: name }, 200, { 'Set-Cookie': await sessionCookie(user, !!body.remember) });
   }
 
   if (body.action === 'login') {
