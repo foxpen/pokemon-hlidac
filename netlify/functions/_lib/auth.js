@@ -2,7 +2,7 @@
 // Přihlášení = podepsaná cookie (HMAC) se jménem, verzí hesla a expirací. Verze se mění s každým
 // nastavením hesla, takže změna nebo reset hesla odhlásí všechna ostatní zařízení. Klíč k podpisu: SESSION_SECRET z env,
 // jinak se při prvním použití vygeneruje a uloží do Blobs (auth/secret), takže se nic nastavovat nemusí.
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { getJson, setJson, del, listJson } from './store.js';
 
@@ -92,3 +92,35 @@ export async function noteFail(name) {
   await setJson(`auth/fail/${name}`, n >= MAX_FAILS ? { n: 0, until: Date.now() + LOCK_MIN * 60e3 } : { n });
 }
 export const clearFails = (name) => del(`auth/fail/${name}`);
+
+// ---- pozvánky: nový účet (kromě prvního) jde založit jen s jednorázovým kódem, platným 7 dní ----
+// Kód PIKA-XXXX-XXXX z 31 znaků bez zaměnitelných (0/O, 1/I/L) = 31^8 možností.
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const INVITE_DAYS = 7;
+const pick4 = () => Array.from({ length: 4 }, () => CODE_CHARS[randomInt(CODE_CHARS.length)]).join('');
+
+// Toleruje malá písmena, mezery a chybějící pomlčky / předponu; vrací kanonický tvar, nebo null.
+export function normCode(input) {
+  const raw = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^PIKA/, '');
+  return raw.length === 8 && [...raw].every((c) => CODE_CHARS.includes(c)) ? `PIKA-${raw.slice(0, 4)}-${raw.slice(4)}` : null;
+}
+
+export async function createInvite(by) {
+  const invite = { code: `PIKA-${pick4()}-${pick4()}`, createdBy: by, createdAt: new Date().toISOString(), expiresAt: Date.now() + INVITE_DAYS * 864e5 };
+  await setJson(`invites/${invite.code}`, invite);
+  return invite;
+}
+
+export async function getInvite(code) {
+  const c = normCode(code);
+  const inv = c ? await getJson(`invites/${c}`) : null;
+  return inv && inv.expiresAt > Date.now() ? inv : null;
+}
+
+export async function listInvites() {
+  const all = await listJson('invites/');
+  await Promise.all(all.filter((i) => i.expiresAt <= Date.now()).map((i) => del(`invites/${i.code}`))); // prošlé uklidit
+  return all.filter((i) => i.expiresAt > Date.now()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export const removeInvite = (code) => { const c = normCode(code); return c ? del(`invites/${c}`) : null; };

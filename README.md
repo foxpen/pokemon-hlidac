@@ -40,7 +40,7 @@ Stack: statický web (`public/`) + Netlify Functions (Node, ESM) + Netlify Blobs
 
 ### Přihlášení
 
-Web je za přihlášením: účty (jméno + heslo) jsou v Netlify Blobs, heslo jen jako otisk (scrypt se solí), přihlášení drží podepsaná cookie (30 dní se „Zapamatovat si mě“, jinak do zavření prohlížeče). Po 5 špatných pokusech je jméno na 5 minut zamčené. Změna nebo reset hesla odhlásí všechna ostatní zařízení toho účtu, smazání účtu ho odhlásí všude. V Nastavení jde změnit heslo, přidat účet, nastavit nové heslo jinému účtu (když ho zapomene) a odhlásit se. Všechny účty vidí stejná data.
+Web je za přihlášením: účty (jméno + heslo) jsou v Netlify Blobs, heslo jen jako otisk (scrypt se solí), přihlášení drží podepsaná cookie (30 dní se „Zapamatovat si mě“, jinak do zavření prohlížeče). Po 5 špatných pokusech je jméno na 5 minut zamčené. Změna nebo reset hesla odhlásí všechna ostatní zařízení toho účtu, smazání účtu ho odhlásí všude. Na přihlašovací obrazovce je výběr „Přihlásit se“ / „Vytvořit účet“. Nový účet (kromě úplně prvního) jde založit jen s **kódem pozvánky** (`PIKA-XXXX-XXXX`), který vytvoří přihlášený trenér v Nastavení; kód platí 7 dní a jde použít jednou. V Nastavení jde dál změnit heslo, přidat účet přímo, nastavit nové heslo jinému účtu (když ho zapomene) a odhlásit se. Všechny účty vidí stejná data.
 
 Naplánované funkce (`cron-scan` v :00, `cron-stock` v :15 a `cron-sets` v :30, každá jednou za hodinu) běží jen na produkčním deployi, ne v preview. Edice se po nasazení plní postupně (PokeData omezuje počet požadavků): nejnovější sety během první hodiny, všech ~165 zhruba za 28 hodin a stejně často se pak obnovují. Edice, ze kterých máš něco ve sbírce, mají přednost a jejich ceny se ukládají každý den.
 

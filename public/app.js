@@ -1395,7 +1395,32 @@ async function loadAccount() {
   const d = await api('account');
   $('#acc-me').textContent = `Přihlášený účet: ${d.user}`;
   renderAccounts(d.user, d.users);
+  renderInvites(d.invites);
 }
+// pozvánky: kód, kdo ho vytvořil, do kdy platí, kopírování a zrušení
+function renderInvites(invites, fresh = null) {
+  $('#inv-list').innerHTML = invites.map((i) => `
+    <li data-code="${esc(i.code)}" class="${i.code === fresh ? 'fresh' : ''}">
+      <span><b class="mono">${esc(i.code)}</b><span class="meta"> · od ${esc(i.createdBy)} · platí do ${fmtDate(i.expiresAt)}</span></span>
+      <span class="row"><button class="btn btn-sm" data-inv="copy">Kopírovat</button><button class="btn btn-sm btn-danger" data-inv="revoke">Zrušit</button></span>
+    </li>`).join('') || '<li class="empty">Žádná platná pozvánka.</li>';
+}
+$('#inv-new').addEventListener('click', (e) => busy(e.target, async () => {
+  const d = await api('account', { action: 'invite' });
+  renderInvites(d.invites, d.invite.code);
+  try { await navigator.clipboard.writeText(d.invite.code); toast(`Pozvánka ${d.invite.code} zkopírovaná`); } catch { toast(`Pozvánka ${d.invite.code} vytvořená`); }
+}));
+$('#inv-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-inv]');
+  if (!b) return;
+  const code = b.closest('li').dataset.code;
+  if (b.dataset.inv === 'copy') {
+    try { await navigator.clipboard.writeText(code); toast('Kód zkopírovaný'); } catch { toast(code); }
+    return;
+  }
+  if (!armed(b, 'Opravdu?')) return;
+  await busy(b, async () => { renderInvites((await api('account', { action: 'revoke', code })).invites); toast('Pozvánka zrušená'); });
+});
 function renderAccounts(me, users) {
   $('#acc-list').innerHTML = users.map((u) => `
     <li data-user="${esc(u.name)}">
@@ -1650,72 +1675,124 @@ function playIntro() {
 }
 
 // ---------- přihlášení ----------
-// Ilustrace se pomalu přibližuje a plují světlušky. Špatné heslo: pokéball se zakymácí a karta zatřese.
+// Ilustrace se pomalu přibližuje a plují světlušky. Karta má tři stránky: výběr, přihlášení a vytvoření
+// účtu. Přihlášení přijede ze strany, vytvoření účtu se „zhmotní“: sletí se světélka, blikne záře
+// a formulář se vynoří z rozmazání. Špatné heslo: pokéball se zakymácí a karta zatřese.
 // Správné: pokéball cvakne a otevře se, záře zaplní obrazovku a mezitím se načtou data.
-const LOGIN_SUB = 'Přihlas se a hlídej s námi novinky, ceny a svou sbírku.';
+// Animace nikdy neschovávají ovládací prvky natrvalo: inline styly se uklízí a pojistka je po chvíli smaže.
 function showLogin(setup) {
-  const el = $('#login'), f = $('#login-form'), q = (s) => $(s, el);
+  const el = $('#login'), card = $('#login-card'), q = (s) => $(s, el);
+  const pane = (name) => q(`.lp[data-pane="${name}"]`);
   el.hidden = false;
   document.body.classList.add('locked');
   // web pod přihlášením nejde projít Tabem ani čtečkou
   $('#app').inert = $('#bnav').inert = true;
-  $('#login-title').textContent = setup ? 'Vítej, trenére!' : 'Vítej zpět, trenére!';
-  $('#login-sub').textContent = setup ? 'Přidej se k hlídce a založ si účet. Další trenéry pak přidáš v Nastavení.' : LOGIN_SUB;
-  $('#login-go-text').textContent = setup ? 'Založit účet' : 'Přihlásit se';
-  $('#login-pw2').hidden = !setup;
-  f.password.autocomplete = setup ? 'new-password' : 'current-password';
   $('#login-flies').innerHTML = Array.from({ length: 24 }, () =>
     `<i style="--x:${(Math.random() * 100).toFixed(1)}%;--y:${(30 + Math.random() * 70).toFixed(1)}%;--d:${(7 + Math.random() * 9).toFixed(1)}s;--t:-${(Math.random() * 12).toFixed(1)}s;--s:${(2 + Math.random() * 3).toFixed(1)}px"></i>`).join('');
+
+  // první účet: rovnou formulář bez kódu a bez cesty zpět
+  const reg = pane('register');
+  if (setup) {
+    $('[data-reg-title]', reg).textContent = 'Vítej, trenére!';
+    $('[data-reg-sub]', reg).textContent = 'Založ první účet hlídky. Další trenéry pak pozveš v Nastavení.';
+    reg.code.closest('.lf').hidden = true;
+    $('.lp-back', reg).hidden = true;
+  }
+  let current = setup ? 'register' : 'choose';
+  pane(current).hidden = false;
+
+  const clean = (els) => gsap.set(els, { clearProps: 'transform,opacity,visibility,filter,height' });
+  const safety = (els) => setTimeout(() => clean(els), 1600); // i kdyby animace stála (karta na pozadí)
   if (motion()) {
-    // Ovládací prvky se neschovávají (jen přijedou), aby zůstaly vidět, i kdyby animace nedoběhla
-    // (stránka načtená na pozadí apod.). Po animaci se inline styly uklidí, pojistka po 2,5 s taky.
-    const kids = q('.login-card').children;
+    const kids = [...pane(current).children];
     gsap.timeline({ defaults: { ease: 'power3.out' } })
       .from(q('.login-brand'), { y: -16, autoAlpha: 0, duration: 0.6, clearProps: 'all' })
-      .from(q('.login-card'), { y: 34, autoAlpha: 0, scale: 0.97, duration: 0.7, clearProps: 'transform,opacity,visibility' }, '-=0.35')
+      .from(card, { y: 34, autoAlpha: 0, scale: 0.97, duration: 0.7, clearProps: 'transform,opacity,visibility' }, '-=0.35')
       .from(q('.intro-ball'), { y: -90, duration: 0.8, ease: 'bounce.out' }, '-=0.5')
       .from(kids, { y: 10, stagger: 0.05, duration: 0.4, clearProps: 'transform' }, '-=0.6');
-    setTimeout(() => gsap.set([q('.login-brand'), q('.login-card'), q('.intro-ball'), ...kids], { clearProps: 'transform,opacity,visibility' }), 2500);
+    setTimeout(() => clean([q('.login-brand'), card, q('.intro-ball'), ...kids]), 2500);
   }
-  f.user.focus();
 
-  // oko: zobrazit / skrýt heslo
-  const eye = q('.lf-eye');
-  eye.onclick = () => {
-    const show = f.password.type === 'password';
-    f.password.type = f.password2.type = show ? 'text' : 'password';
+  // přepnutí stránky karty: 'slide' (přijede ze strany) nebo 'spawn' (zhmotní se z ničeho)
+  async function go(to, how) {
+    if (to === current) return;
+    const from = pane(current), next = pane(to), dir = to === 'choose' ? -1 : 1;
+    current = to;
+    $$('.login-err', el).forEach((e) => (e.textContent = ''));
+    if (!motion()) { from.hidden = true; next.hidden = false; focusPane(next); return; }
+    const h0 = card.offsetHeight;
+    await gsap.to(from, how === 'spawn'
+      ? { scale: 0.94, autoAlpha: 0, duration: 0.22, ease: 'power2.in' }
+      : { x: -40 * dir, autoAlpha: 0, duration: 0.22, ease: 'power2.in' }).then();
+    from.hidden = true;
+    clean(from);
+    next.hidden = false;
+    const h1 = card.offsetHeight;
+    safety([card, next]);
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+      .fromTo(card, { height: h0 }, { height: h1, duration: 0.4, clearProps: 'height' }, 0);
+    if (how === 'spawn') {
+      // světélka se sletí do středu karty, blikne záře a formulář se vynoří z rozmazání
+      const sparks = q('.lp-sparks');
+      sparks.innerHTML = '<i></i>'.repeat(14);
+      tl.fromTo(sparks.children,
+        { x: () => (Math.random() - 0.5) * 520, y: () => (Math.random() - 0.5) * 420, scale: 1.4, autoAlpha: 0 },
+        { x: 0, y: 0, scale: 0.2, autoAlpha: 1, duration: 0.5, stagger: 0.02, ease: 'power2.in' }, 0)
+        .fromTo(q('.lp-flash'), { autoAlpha: 0 }, { autoAlpha: 0.85, duration: 0.12, yoyo: true, repeat: 1, ease: 'power1.out' }, 0.62)
+        .set(sparks.children, { autoAlpha: 0 }, 0.8) // až doletí i poslední (0,5 s + 13 × 0,02 s)
+        .fromTo(next, { scale: 0.82, autoAlpha: 0, filter: 'blur(12px)' },
+          { scale: 1, autoAlpha: 1, filter: 'blur(0px)', duration: 0.55, ease: 'back.out(1.6)', clearProps: 'transform,opacity,visibility,filter' }, 0.66)
+        .call(() => (sparks.innerHTML = ''));
+    } else {
+      tl.fromTo(next, { x: 40 * dir, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.4, clearProps: 'transform,opacity,visibility' }, 0.05);
+    }
+    focusPane(next);
+  }
+  const focusPane = (p) => $('input:not([type=checkbox]):not([hidden])', p)?.closest('.lf:not([hidden])')?.querySelector('input')?.focus({ preventScroll: true });
+  el.onclick = (e) => {
+    const b = e.target.closest('[data-pane-go]');
+    if (!b) return;
+    const to = b.dataset.paneGo;
+    go(to, to === 'register' ? 'spawn' : 'slide');
+  };
+  // oko: zobrazit / skrýt heslo v daném formuláři
+  $$('.lf-eye', el).forEach((eye) => (eye.onclick = () => {
+    const f = eye.closest('form'), show = f.password.type === 'password';
+    $$('input[name^="password"]', f).forEach((i) => (i.type = show ? 'text' : 'password'));
     eye.setAttribute('aria-pressed', String(show));
     eye.setAttribute('aria-label', show ? 'Skrýt heslo' : 'Zobrazit heslo');
-  };
+  }));
+  focusPane(pane(current));
 
-  const fail = (msg) => {
-    $('#login-err').textContent = msg;
-    f.password.value = '';
-    if (setup) f.password2.value = '';
+  const fail = (f, msg) => {
+    $('.login-err', f).textContent = msg;
+    $$('input[name^="password"]', f).forEach((i) => (i.value = ''));
     f.password.focus();
     if (!motion()) return;
     gsap.timeline()
-      .to(q('.login-card'), { keyframes: { x: [-10, 10, -7, 7, -3, 0] }, duration: 0.45, ease: 'power2.out' })
+      .to(card, { keyframes: { x: [-10, 10, -7, 7, -3, 0] }, duration: 0.45, ease: 'power2.out', clearProps: 'transform' })
       .to(q('.intro-ball'), { keyframes: { rotation: [-18, 15, -9, 5, 0] }, duration: 0.6, transformOrigin: '50% 90%', ease: 'sine.inOut' }, 0);
   };
 
   return new Promise((resolve) => {
-    f.onsubmit = async (e) => {
+    const submit = (f, body, check) => async (e) => {
       e.preventDefault();
-      $('#login-err').textContent = '';
-      if (!f.user.value.trim() || !f.password.value) return fail('Vyplň jméno i heslo.');
-      if (setup && f.password.value !== f.password2.value) return fail('Hesla se neshodují.');
-      const btn = q('.login-go');
+      $('.login-err', f).textContent = '';
+      const msg = check();
+      if (msg) return fail(f, msg);
+      const btn = $('button[type=submit]', f);
       btn.disabled = true;
-      try {
-        const r = await api('auth', { action: setup ? 'setup' : 'login', user: f.user.value, password: f.password.value, remember: f.remember.checked });
-        resolve(r.user);
-      } catch (x) {
-        fail(x.message);
-      } finally {
-        btn.disabled = false;
-      }
+      try { resolve((await api('auth', body())).user); } catch (x) { fail(f, x.message); } finally { btn.disabled = false; }
     };
+    const lf = pane('login');
+    lf.onsubmit = submit(lf,
+      () => ({ action: 'login', user: lf.user.value, password: lf.password.value, remember: lf.remember.checked }),
+      () => (!lf.user.value.trim() || !lf.password.value ? 'Vyplň jméno i heslo.' : ''));
+    reg.onsubmit = submit(reg,
+      () => ({ action: setup ? 'setup' : 'register', code: reg.code.value, user: reg.user.value, password: reg.password.value, remember: reg.remember.checked }),
+      () => (!setup && !reg.code.value.trim() ? 'Zadej kód pozvánky.'
+        : !reg.user.value.trim() || !reg.password.value ? 'Vyplň jméno i heslo.'
+        : reg.password.value !== reg.password2.value ? 'Hesla se neshodují.' : ''));
   });
 }
 
