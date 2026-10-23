@@ -45,7 +45,9 @@ export function configured() {
 }
 
 async function telegram(ev) {
-  const text = `${ICON[ev.type] || '•'} <b>${esc(LABEL[ev.type] || ev.type)}</b>\n${esc(ev.title)}\n${esc(lines(ev))}${ev.url ? `\n${esc(ev.url)}` : ''}`;
+  // „Hlídka hlásí: zpět skladem“
+  const label = String(LABEL[ev.type] || ev.type);
+  const text = `${ICON[ev.type] || '•'} <b>Hlídka hlásí: ${esc(label.charAt(0).toLowerCase() + label.slice(1))}</b>\n${esc(ev.title)}\n${esc(lines(ev))}${ev.url ? `\n${esc(ev.url)}` : ''}`;
   const res = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -59,7 +61,7 @@ async function discord(ev) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      username: 'Pokémon hlídač',
+      username: 'Pokémon Hlídka',
       embeds: [{
         title: `${ICON[ev.type] || ''} ${LABEL[ev.type] || ev.type}: ${ev.title}`.slice(0, 250),
         url: ev.url || undefined,

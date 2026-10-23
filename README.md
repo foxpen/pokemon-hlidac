@@ -1,4 +1,4 @@
-# Pokémon hlídač
+# Pokémon Hlídka
 
 Webovka, která hlídá **Pokémon TCG na českém trhu**: nové produkty a předprodeje v CZ e-shopech, sklad a ceny konkrétních produktů a novinky / ohlášení setů. Změny posílá do **Telegramu** a/nebo **Discordu**.
 
