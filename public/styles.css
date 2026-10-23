@@ -193,6 +193,80 @@ input::placeholder { color: var(--faint); }
 .intro-name { font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
 .intro-status { color: var(--muted); font-size: 13px; min-height: 1.5em; }
 
+/* ---------- přihlášení ---------- */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.script { font-family: 'Caveat', var(--font); font-weight: 700; letter-spacing: 0; }
+body.locked { overflow: hidden; }
+.login {
+  position: fixed; inset: 0; z-index: var(--z-intro); overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); background: var(--bg);
+}
+/* ilustrace se pomalu přibližuje (jen transform, běží na kompozitoru) */
+.login-bg {
+  position: absolute; inset: -4%; z-index: -2;
+  background:
+    radial-gradient(70% 80% at 50% 50%, rgba(7, 8, 11, 0), rgba(7, 8, 11, .55)),
+    linear-gradient(180deg, rgba(7, 8, 11, .05), rgba(7, 8, 11, .35)),
+    url('img/udoli-hero.webp') 62% 70% / cover no-repeat;
+  animation: login-zoom 32s ease-in-out infinite alternate;
+}
+@keyframes login-zoom { from { transform: scale(1); } to { transform: scale(1.09) translate(-1%, -1%); } }
+/* světlušky: pozice, rychlost a velikost nastavuje JS přes proměnné */
+.login-flies { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.login-flies i {
+  position: absolute; left: var(--x); top: var(--y); width: var(--s); height: var(--s); border-radius: 50%;
+  background: #ffe9a3; box-shadow: 0 0 10px 3px rgba(255, 214, 102, .65); opacity: 0;
+  animation: fly var(--d) ease-in-out var(--t) infinite;
+}
+@keyframes fly {
+  0% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: .9; }
+  50% { transform: translate(24px, -46px); opacity: .5; }
+  80% { opacity: .9; }
+  100% { opacity: 0; transform: translate(-14px, -92px); }
+}
+.login-brand {
+  position: absolute; top: 22px; left: 26px; display: flex; align-items: center; gap: 10px;
+  font-size: 22px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; text-shadow: 0 2px 14px rgba(0, 0, 0, .6);
+}
+.login-brand .script { font-size: 30px; color: var(--accent); }
+.login-card {
+  position: relative; width: min(440px, 100%); padding: 22px 30px 28px;
+  display: flex; flex-direction: column; gap: 14px; text-align: center;
+  background: rgba(14, 18, 28, .52); backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 26px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 30px 80px -24px rgba(0, 0, 0, .85);
+}
+/* pokéball z úvodu, zmenšený */
+.login-ball { width: 104px; height: 104px; margin: -14px auto -24px; transform: scale(.6); }
+.login-card h1 { margin: 0; font-size: clamp(34px, 6vw, 42px); line-height: 1.05; color: #fff; text-shadow: 0 2px 18px rgba(0, 0, 0, .45); }
+.login-sub { margin: -4px auto 6px; max-width: 34ch; color: rgba(236, 236, 241, .82); font-size: 14px; }
+.lf {
+  position: relative; display: flex; align-items: center;
+  border-radius: 14px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .16);
+  transition: border-color .2s var(--ease), background .2s var(--ease), box-shadow .2s var(--ease);
+}
+.lf:focus-within { border-color: rgba(242, 194, 48, .7); background: rgba(255, 255, 255, .1); box-shadow: 0 0 0 3px var(--accent-soft); }
+.lf > .ico { position: absolute; left: 16px; width: 20px; height: 20px; color: var(--muted); pointer-events: none; }
+.lf input { flex: 1; min-height: 52px; padding: 0 48px; font-size: 15px; background: none; border: 0; border-radius: 14px; box-shadow: none; }
+.lf input:focus { box-shadow: none; }
+.lf-eye { position: absolute; right: 6px; width: 40px; height: 40px; display: grid; place-items: center; color: var(--muted); background: none; border: 0; border-radius: 10px; cursor: pointer; }
+.lf-eye:hover, .lf-eye[aria-pressed="true"] { color: var(--text); }
+.lf-eye .ico { width: 20px; height: 20px; }
+.login-remember { justify-content: flex-start; font-size: 13.5px; color: rgba(236, 236, 241, .85); }
+.login-err { margin: -4px 0 0; min-height: 1.4em; color: #ff8a7a; font-size: 13px; font-weight: 500; }
+.login-go { min-height: 52px; border-radius: 999px; font-size: 15px; }
+.login-go:disabled { cursor: progress; }
+.login-foot { margin: 0; color: rgba(236, 236, 241, .62); font-size: 12px; text-shadow: 0 1px 8px rgba(0, 0, 0, .7); }
+.acc-list li { align-items: center; }
+.acc-list .row { gap: 6px; flex-wrap: nowrap; }
+@media (max-width: 767px) {
+  .login { justify-content: flex-end; padding-top: 88px; }
+  .login-brand { left: 50%; transform: translateX(-50%); top: 26px; }
+  .login-card { padding: 18px 20px 24px; }
+}
+
 /* ---------- profil v horní liště ---------- */
 .top-actions { display: flex; align-items: center; gap: 8px; }
 .me {
@@ -922,5 +996,5 @@ section[data-view="profile"] .panel-head { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
-  .intro { display: none; }
+  .intro, .login-flies { display: none; }
 }
