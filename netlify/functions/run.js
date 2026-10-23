@@ -12,7 +12,7 @@ export default endpoint(async (req) => {
   if (job === 'scan') return json(await runScan({ deadline, only: shop }));
   if (job === 'sets') return json(await runSets({ deadline }));
   if (job === 'test') {
-    const r = await notify([{ type: 'test', title: 'Pokémon hlídač je napojený 👍', url: new URL(req.url).origin }]);
+    const r = await notify([{ type: 'test', title: 'Pokémon Hlídka je napojená 👍', url: new URL(req.url).origin }]);
     return json(r);
   }
   return json({ error: 'Neznámá úloha' }, 400);

@@ -1,4 +1,4 @@
-// Pokémon hlídač — dashboard. Bez build kroku, data přes /.netlify/functions/*.
+// Pokémon Hlídka — dashboard. Bez build kroku, data přes /.netlify/functions/*.
 const API = '/.netlify/functions';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -1620,7 +1620,7 @@ function playIntro() {
     .from(ball, { y: -180, duration: 0.8, ease: 'bounce.out' })
     .from(shadow, { scale: 0.3, autoAlpha: 0, duration: 0.8, ease: 'bounce.out' }, '<')
     .from('.intro-name, .intro-status', { y: 10, autoAlpha: 0, stagger: 0.08, duration: 0.45, ease: 'power3.out' }, '-=0.35');
-  const slow = setTimeout(() => { $('#intro-status').textContent = 'Ještě chvilku, sbírám data z obchodů…'; }, 2500);
+  const slow = setTimeout(() => { $('#intro-status').textContent = 'Procházím obchody…'; }, 2500);
 
   let done = null;
   const finish = () => (done ||= (async () => {
@@ -1652,7 +1652,7 @@ function playIntro() {
 // ---------- přihlášení ----------
 // Ilustrace se pomalu přibližuje a plují světlušky. Špatné heslo: pokéball se zakymácí a karta zatřese.
 // Správné: pokéball cvakne a otevře se, záře zaplní obrazovku a mezitím se načtou data.
-const LOGIN_SUB = 'Přihlas se a měj přehled o novinkách, cenách a své sbírce.';
+const LOGIN_SUB = 'Přihlas se a hlídej s námi novinky, ceny a svou sbírku.';
 function showLogin(setup) {
   const el = $('#login'), f = $('#login-form'), q = (s) => $(s, el);
   el.hidden = false;
@@ -1660,7 +1660,7 @@ function showLogin(setup) {
   // web pod přihlášením nejde projít Tabem ani čtečkou
   $('#app').inert = $('#bnav').inert = true;
   $('#login-title').textContent = setup ? 'Vítej, trenére!' : 'Vítej zpět, trenére!';
-  $('#login-sub').textContent = setup ? 'Založ si účet do hlídače. Další účty pak přidáš v Nastavení.' : LOGIN_SUB;
+  $('#login-sub').textContent = setup ? 'Přidej se k hlídce a založ si účet. Další trenéry pak přidáš v Nastavení.' : LOGIN_SUB;
   $('#login-go-text').textContent = setup ? 'Založit účet' : 'Přihlásit se';
   $('#login-pw2').hidden = !setup;
   f.password.autocomplete = setup ? 'new-password' : 'current-password';
@@ -1668,7 +1668,7 @@ function showLogin(setup) {
     `<i style="--x:${(Math.random() * 100).toFixed(1)}%;--y:${(30 + Math.random() * 70).toFixed(1)}%;--d:${(7 + Math.random() * 9).toFixed(1)}s;--t:-${(Math.random() * 12).toFixed(1)}s;--s:${(2 + Math.random() * 3).toFixed(1)}px"></i>`).join('');
   if (motion()) {
     gsap.timeline({ defaults: { ease: 'power3.out' } })
-      .from(q('.login-brand'), { y: -16, autoAlpha: 0, duration: 0.6 })
+      .from(q('.login-brand'), { y: -16, autoAlpha: 0, duration: 0.6, clearProps: 'transform' })
       .from(q('.login-card'), { y: 34, autoAlpha: 0, scale: 0.97, duration: 0.7 }, '-=0.35')
       .from(q('.intro-ball'), { y: -90, duration: 0.8, ease: 'bounce.out' }, '-=0.5')
       .from(q('.login-card').children, { y: 10, autoAlpha: 0, stagger: 0.05, duration: 0.4 }, '-=0.6');

@@ -263,7 +263,7 @@ body.locked { overflow: hidden; }
 .acc-list .row { gap: 6px; flex-wrap: nowrap; }
 @media (max-width: 767px) {
   .login { justify-content: flex-end; padding-top: 88px; }
-  .login-brand { left: 50%; transform: translateX(-50%); top: 26px; }
+  .login-brand { left: 0; right: 0; justify-content: center; top: 26px; } /* bez transformace, tu přepisuje vstupní animace */
   .login-card { padding: 18px 20px 24px; }
 }
 
