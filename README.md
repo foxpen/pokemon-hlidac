@@ -32,9 +32,15 @@ Stack: statický web (`public/`) + Netlify Functions (Node, ESM) + Netlify Blobs
 | `TELEGRAM_BOT_TOKEN` | – | token bota od @BotFather |
 | `TELEGRAM_CHAT_ID` | – | kam bot píše (tvoje chat ID) |
 | `DISCORD_WEBHOOK_URL` | – | webhook kanálu |
+| `SESSION_SECRET` | – | klíč k podpisu přihlášení (aspoň 32 znaků). Bez něj se vygeneruje sám a uloží do Blobs. |
 
 3. Po změně env proměnných **Deploys → Trigger deploy**.
-4. Otevři web → Nastavení → **Poslat testovací zprávu** (jen když jsi nastavil Telegram nebo Discord).
+4. **Hned po prvním nasazení otevři web a založ si účet** (jméno + heslo). Dokud žádný účet neexistuje, může ho založit kdokoli, kdo web otevře. Další účty pak přidáš v Nastavení.
+5. Otevři web → Nastavení → **Poslat testovací zprávu** (jen když jsi nastavil Telegram nebo Discord).
+
+### Přihlášení
+
+Web je za přihlášením: účty (jméno + heslo) jsou v Netlify Blobs, heslo jen jako otisk (scrypt se solí), přihlášení drží podepsaná cookie (30 dní se „Zapamatovat si mě“, jinak do zavření prohlížeče). Po 5 špatných pokusech je jméno na 5 minut zamčené. Změna nebo reset hesla odhlásí všechna ostatní zařízení toho účtu, smazání účtu ho odhlásí všude. V Nastavení jde změnit heslo, přidat účet, nastavit nové heslo jinému účtu (když ho zapomene) a odhlásit se. Všechny účty vidí stejná data.
 
 Naplánované funkce (`cron-scan` v :00, `cron-stock` v :15 a `cron-sets` v :30, každá jednou za hodinu) běží jen na produkčním deployi, ne v preview. Edice se po nasazení plní postupně (PokeData omezuje počet požadavků): nejnovější sety během první hodiny, všech ~165 zhruba za 28 hodin a stejně často se pak obnovují. Edice, ze kterých máš něco ve sbírce, mají přednost a jejich ceny se ukládají každý den.
 
@@ -53,7 +59,7 @@ npm install
 npm run dev        # netlify dev (npx netlify-cli) na http://localhost:8888
 ```
 
-Web je bez přihlášení (stránka má `noindex`, adresu zná jen majitel). Volitelné tokeny pro notifikace dej lokálně do `.env` (je v `.gitignore`). Netlify Blobs fungují v `netlify dev` lokálně. Cron lokálně neběží — použij v Nastavení „Skenovat teď“ / „Zkontrolovat hlídané“.
+Při prvním lokálním spuštění si web řekne o založení účtu (lokální účty jsou jen v `.netlify/`). Volitelné tokeny pro notifikace dej lokálně do `.env` (je v `.gitignore`). Netlify Blobs fungují v `netlify dev` lokálně. Cron lokálně neběží — použij v Nastavení „Skenovat teď“ / „Zkontrolovat hlídané“.
 
 Testy parserů proti živým webům:
 

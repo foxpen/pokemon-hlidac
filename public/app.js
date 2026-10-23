@@ -10,6 +10,7 @@ const DAY = 86400e3;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let S = null; // poslední stav ze serveru
+let AUTHED = false; // po vypršení přihlášení (401) se stránka načte znovu a ukáže přihlášení
 
 // ---------- utils ----------
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -50,6 +51,7 @@ async function api(name, body) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.auth === false && AUTHED) { AUTHED = false; location.reload(); }
   if (!res.ok) throw new Error(data.error || `Server odpověděl chybou ${res.status}`);
   return data;
 }
@@ -163,6 +165,7 @@ function setView(v, { push = true } = {}) {
   try { localStorage.setItem('ph_view', v); } catch {}
   if (v === 'sets' && !SETS.data && S) loadSets().then(() => animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 })).catch((e) => toast(e.message, true));
   if (v === 'profile') PF.data ? renderPfChart() : loadPortfolio().catch((e) => toast(e.message, true));
+  if (v === 'settings' && AUTHED) loadAccount().catch((e) => toast(e.message, true));
   if (S && !shownViews.has(v)) {
     shownViews.add(v);
     const sec = $(`.content > section[data-view="${v}"]`);
@@ -1387,6 +1390,58 @@ function renderNews() {
 $('#n-announce').addEventListener('change', renderNews);
 $('#n-cz').addEventListener('change', renderNews);
 
+// ---------- účet (Nastavení) ----------
+async function loadAccount() {
+  const d = await api('account');
+  $('#acc-me').textContent = `Přihlášený účet: ${d.user}`;
+  renderAccounts(d.user, d.users);
+}
+function renderAccounts(me, users) {
+  $('#acc-list').innerHTML = users.map((u) => `
+    <li data-user="${esc(u.name)}">
+      <span><b>${esc(u.name)}</b>${u.name === me ? ' <span class="muted">· ty</span>' : ''}</span>
+      ${u.name === me ? '' : `<span class="row"><button class="btn btn-sm" data-acc="reset">Nové heslo</button><button class="btn btn-sm btn-danger" data-acc="remove">Smazat</button></span>`}
+    </li>`).join('');
+}
+$('#acc-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-acc]');
+  if (!b) return;
+  const li = b.closest('li'), user = li.dataset.user;
+  if (b.dataset.acc === 'remove') {
+    if (!armed(b, 'Opravdu smazat?')) return;
+    await busy(b, async () => { const d = await api('account', { action: 'remove', user }); renderAccounts($('#acc-me').textContent.split(': ')[1], d.users); toast(`Účet ${user} smazán`); });
+    return;
+  }
+  // nové heslo pro jiný účet (kdo zapomněl) — formulář přímo v řádku
+  if (li.nextElementSibling?.classList.contains('acc-reset')) { li.nextElementSibling.remove(); return; }
+  li.insertAdjacentHTML('afterend', `<li class="acc-reset"><form class="row"><label class="field grow"><span>Nové heslo pro ${esc(user)}</span><input name="password" type="password" autocomplete="new-password" minlength="8" required></label><button class="btn" type="submit">Nastavit</button></form></li>`);
+  const f = li.nextElementSibling.querySelector('form');
+  f.password.focus();
+  f.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    busy(f.querySelector('button'), async () => { await api('account', { action: 'reset', user, password: f.password.value }); f.closest('li').remove(); toast(`Heslo pro ${user} změněno`); });
+  });
+});
+$('#pw-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = e.target;
+  busy(f.querySelector('button'), async () => { await api('account', { action: 'password', old: f.old.value, password: f.password.value }); f.reset(); toast('Heslo změněno'); });
+});
+$('#acc-add').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = e.target;
+  busy(f.querySelector('button'), async () => {
+    const d = await api('account', { action: 'add', user: f.user.value, password: f.password.value });
+    renderAccounts($('#acc-me').textContent.split(': ')[1], d.users);
+    toast(`Účet ${f.user.value.trim().toLowerCase()} přidán`);
+    f.reset();
+  });
+});
+$('#logout').addEventListener('click', (e) => busy(e.target, async () => {
+  await api('auth', { action: 'logout' });
+  location.reload();
+}));
+
 // ---------- nastavení ----------
 function renderSettings() {
   const c = S.channels;
@@ -1578,12 +1633,12 @@ function playIntro() {
     await gsap.timeline({ defaults: { ease: 'power3.out' } })
       .to(ball, { rotation: 0, duration: 0.12 })
       .addLabel('click')
-      .to('.ib-btn', { scale: 1.25, backgroundColor: '#fffbe6', boxShadow: '0 0 0 4px #0a0a0a, 0 0 28px 10px rgba(242, 194, 48, .9)', duration: 0.12 }, 'click')
+      .to($('.ib-btn', el), { scale: 1.25, backgroundColor: '#fffbe6', boxShadow: '0 0 0 4px #0a0a0a, 0 0 28px 10px rgba(242, 194, 48, .9)', duration: 0.12 }, 'click')
       .addLabel('open', '+=0.08')
-      .to('.ib-top', { yPercent: -70, rotation: -22, duration: 0.5 }, 'open')
-      .to('.ib-bottom', { yPercent: 70, rotation: 12, duration: 0.5 }, 'open')
-      .to('.ib-btn', { scale: 0, duration: 0.25, ease: 'power2.in' }, 'open')
-      .fromTo('.ib-flash', { scale: 0, autoAlpha: 1 }, { scale: 26, autoAlpha: 0, duration: 0.7, ease: 'power2.out' }, 'open')
+      .to($('.ib-top', el), { yPercent: -70, rotation: -22, duration: 0.5 }, 'open')
+      .to($('.ib-bottom', el), { yPercent: 70, rotation: 12, duration: 0.5 }, 'open')
+      .to($('.ib-btn', el), { scale: 0, duration: 0.25, ease: 'power2.in' }, 'open')
+      .fromTo($('.ib-flash', el), { scale: 0, autoAlpha: 1 }, { scale: 26, autoAlpha: 0, duration: 0.7, ease: 'power2.out' }, 'open')
       .to('.intro-name, .intro-status, .intro-shadow', { autoAlpha: 0, duration: 0.25 }, 'open')
       .to(el, { autoAlpha: 0, duration: 0.35, ease: 'power1.in' }, 'open+=0.3');
     el.removeEventListener('pointerdown', onKey);
@@ -1594,17 +1649,118 @@ function playIntro() {
   return { finish };
 }
 
+// ---------- přihlášení ----------
+// Ilustrace se pomalu přibližuje a plují světlušky. Špatné heslo: pokéball se zakymácí a karta zatřese.
+// Správné: pokéball cvakne a otevře se, záře zaplní obrazovku a mezitím se načtou data.
+const LOGIN_SUB = 'Přihlas se a měj přehled o novinkách, cenách a své sbírce.';
+function showLogin(setup) {
+  const el = $('#login'), f = $('#login-form'), q = (s) => $(s, el);
+  el.hidden = false;
+  document.body.classList.add('locked');
+  // web pod přihlášením nejde projít Tabem ani čtečkou
+  $('#app').inert = $('#bnav').inert = true;
+  $('#login-title').textContent = setup ? 'Vítej, trenére!' : 'Vítej zpět, trenére!';
+  $('#login-sub').textContent = setup ? 'Založ si účet do hlídače. Další účty pak přidáš v Nastavení.' : LOGIN_SUB;
+  $('#login-go-text').textContent = setup ? 'Založit účet' : 'Přihlásit se';
+  $('#login-pw2').hidden = !setup;
+  f.password.autocomplete = setup ? 'new-password' : 'current-password';
+  $('#login-flies').innerHTML = Array.from({ length: 24 }, () =>
+    `<i style="--x:${(Math.random() * 100).toFixed(1)}%;--y:${(30 + Math.random() * 70).toFixed(1)}%;--d:${(7 + Math.random() * 9).toFixed(1)}s;--t:-${(Math.random() * 12).toFixed(1)}s;--s:${(2 + Math.random() * 3).toFixed(1)}px"></i>`).join('');
+  if (motion()) {
+    gsap.timeline({ defaults: { ease: 'power3.out' } })
+      .from(q('.login-brand'), { y: -16, autoAlpha: 0, duration: 0.6 })
+      .from(q('.login-card'), { y: 34, autoAlpha: 0, scale: 0.97, duration: 0.7 }, '-=0.35')
+      .from(q('.intro-ball'), { y: -90, duration: 0.8, ease: 'bounce.out' }, '-=0.5')
+      .from(q('.login-card').children, { y: 10, autoAlpha: 0, stagger: 0.05, duration: 0.4 }, '-=0.6');
+  }
+  f.user.focus();
+
+  // oko: zobrazit / skrýt heslo
+  const eye = q('.lf-eye');
+  eye.onclick = () => {
+    const show = f.password.type === 'password';
+    f.password.type = f.password2.type = show ? 'text' : 'password';
+    eye.setAttribute('aria-pressed', String(show));
+    eye.setAttribute('aria-label', show ? 'Skrýt heslo' : 'Zobrazit heslo');
+  };
+
+  const fail = (msg) => {
+    $('#login-err').textContent = msg;
+    f.password.value = '';
+    if (setup) f.password2.value = '';
+    f.password.focus();
+    if (!motion()) return;
+    gsap.timeline()
+      .to(q('.login-card'), { keyframes: { x: [-10, 10, -7, 7, -3, 0] }, duration: 0.45, ease: 'power2.out' })
+      .to(q('.intro-ball'), { keyframes: { rotation: [-18, 15, -9, 5, 0] }, duration: 0.6, transformOrigin: '50% 90%', ease: 'sine.inOut' }, 0);
+  };
+
+  return new Promise((resolve) => {
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      $('#login-err').textContent = '';
+      if (!f.user.value.trim() || !f.password.value) return fail('Vyplň jméno i heslo.');
+      if (setup && f.password.value !== f.password2.value) return fail('Hesla se neshodují.');
+      const btn = q('.login-go');
+      btn.disabled = true;
+      try {
+        const r = await api('auth', { action: setup ? 'setup' : 'login', user: f.user.value, password: f.password.value, remember: f.remember.checked });
+        resolve(r.user);
+      } catch (x) {
+        fail(x.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+}
+
+async function finishLogin(dataReady) {
+  const el = $('#login'), q = (s) => $(s, el);
+  if (motion()) {
+    await gsap.timeline({ defaults: { ease: 'power3.out' } })
+      .to(q('.intro-ball'), { rotation: 0, duration: 0.1 })
+      .to(q('.ib-btn'), { scale: 1.25, backgroundColor: '#fffbe6', boxShadow: '0 0 0 4px #0a0a0a, 0 0 28px 10px rgba(242, 194, 48, .9)', duration: 0.14 })
+      .addLabel('open', '+=0.08')
+      .to(q('.ib-top'), { yPercent: -70, rotation: -22, duration: 0.5 }, 'open')
+      .to(q('.ib-bottom'), { yPercent: 70, rotation: 12, duration: 0.5 }, 'open')
+      .to(q('.ib-btn'), { scale: 0, duration: 0.25, ease: 'power2.in' }, 'open')
+      .fromTo(q('.ib-flash'), { scale: 0, autoAlpha: 1 }, { scale: 70, autoAlpha: 1, duration: 0.8, ease: 'power2.in' }, 'open')
+      .then();
+  }
+  await dataReady; // data se načítají, zatímco záře zakrývá obrazovku
+  if (motion()) await gsap.to(el, { autoAlpha: 0, duration: 0.5, ease: 'power1.inOut' }).then();
+  el.remove();
+  document.body.classList.remove('locked');
+  $('#app').inert = $('#bnav').inert = false;
+}
+
 // ---------- start ----------
 async function start() {
   // adresa má přednost (odkaz, obnovení stránky), jinak naposledy otevřená sekce
   const route = parseHash();
   let v = route.v || 'overview';
   if (!route.v) try { v = localStorage.getItem('ph_view') || v; } catch {}
-  const intro = playIntro();
-  loadPortfolio().catch(() => {}); // jméno a hodnota sbírky do horní lišty
-  loadSets().catch(() => {}); // nejcennější karty na Přehledu a edice ve hledání
-  try { await load(); } catch (e) { toast(e.message, true); }
-  await intro.finish();
+  const loadAll = async () => {
+    loadPortfolio().catch(() => {}); // jméno a hodnota sbírky do horní lišty
+    loadSets().catch(() => {}); // nejcennější karty na Přehledu a edice ve hledání
+    try { await load(); } catch (e) { toast(e.message, true); }
+  };
+  let me = null;
+  try { me = await api('auth'); } catch (e) { toast(e.message, true); }
+  if (me && !me.authed) {
+    // nepřihlášený: místo úvodní animace přihlašovací obrazovka (má vlastní otevření pokéballu)
+    $('#intro').remove();
+    await showLogin(me.setup);
+    AUTHED = true;
+    await finishLogin(loadAll());
+  } else {
+    AUTHED = !!me?.authed;
+    $('#login').remove();
+    const intro = playIntro();
+    await loadAll();
+    await intro.finish();
+  }
   if (v === 'sets' && route.setId) openSet(route.setId, { push: false });
   else setView(v, { push: false });
   pushRoute(route.setId && v === 'sets' ? `#/edice/${route.setId}` : `#/${SLUG[v]}`, true);

@@ -31,7 +31,8 @@ export default endpoint(async (req) => {
     return json({ ok: true, item });
   }
 
-  const item = body.id ? await getJson(`watch/${body.id}`) : null;
+  // id je vždy 16 hex znaků (idFor), nic jiného se do klíče úložiště nedostane
+  const item = /^[0-9a-f]{16}$/.test(String(body.id || '')) ? await getJson(`watch/${body.id}`) : null;
   if (!item) return json({ error: 'Položka nenalezena' }, 404);
 
   if (action === 'remove') {
