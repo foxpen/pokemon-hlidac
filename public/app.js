@@ -1667,11 +1667,15 @@ function showLogin(setup) {
   $('#login-flies').innerHTML = Array.from({ length: 24 }, () =>
     `<i style="--x:${(Math.random() * 100).toFixed(1)}%;--y:${(30 + Math.random() * 70).toFixed(1)}%;--d:${(7 + Math.random() * 9).toFixed(1)}s;--t:-${(Math.random() * 12).toFixed(1)}s;--s:${(2 + Math.random() * 3).toFixed(1)}px"></i>`).join('');
   if (motion()) {
+    // Ovládací prvky se neschovávají (jen přijedou), aby zůstaly vidět, i kdyby animace nedoběhla
+    // (stránka načtená na pozadí apod.). Po animaci se inline styly uklidí, pojistka po 2,5 s taky.
+    const kids = q('.login-card').children;
     gsap.timeline({ defaults: { ease: 'power3.out' } })
-      .from(q('.login-brand'), { y: -16, autoAlpha: 0, duration: 0.6, clearProps: 'transform' })
-      .from(q('.login-card'), { y: 34, autoAlpha: 0, scale: 0.97, duration: 0.7 }, '-=0.35')
+      .from(q('.login-brand'), { y: -16, autoAlpha: 0, duration: 0.6, clearProps: 'all' })
+      .from(q('.login-card'), { y: 34, autoAlpha: 0, scale: 0.97, duration: 0.7, clearProps: 'transform,opacity,visibility' }, '-=0.35')
       .from(q('.intro-ball'), { y: -90, duration: 0.8, ease: 'bounce.out' }, '-=0.5')
-      .from(q('.login-card').children, { y: 10, autoAlpha: 0, stagger: 0.05, duration: 0.4 }, '-=0.6');
+      .from(kids, { y: 10, stagger: 0.05, duration: 0.4, clearProps: 'transform' }, '-=0.6');
+    setTimeout(() => gsap.set([q('.login-brand'), q('.login-card'), q('.intro-ball'), ...kids], { clearProps: 'transform,opacity,visibility' }), 2500);
   }
   f.user.focus();
 
