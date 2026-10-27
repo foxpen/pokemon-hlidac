@@ -14,7 +14,8 @@ let AUTHED = false; // po vypršení přihlášení (401) se stránka načte zno
 
 // ---------- utils ----------
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? esc(u) : '#');
+// vlastní proxy obrázků Cyberpunk TCG je relativní adresa, jinak jen http(s)
+const safeUrl = (u) => (/^https?:\/\//i.test(u || '') || /^\/\.netlify\/functions\/cp-img\?p=[0-9a-f-]+$/.test(u || '') ? esc(u) : '#');
 const price = (p) => (p == null ? '—' : `${Math.round(p).toLocaleString('cs-CZ')} Kč`);
 const badge = (a) => `<span class="badge b-${esc(a || 'unknown')}">${AVAIL[a] || AVAIL.unknown}</span>`;
 const img = (src, cls = 'thumb', alt = '') =>
@@ -525,10 +526,11 @@ function renderMarketFilters() {
 
 function renderMarket() {
   const q = norm($('#m-search').value).split(/\s+/).filter(Boolean);
-  const av = $('#m-avail').value, shop = $('#m-shop').value, sort = $('#m-sort').value;
+  const av = $('#m-avail').value, shop = $('#m-shop').value, sort = $('#m-sort').value, game = $('#m-game').value;
   const watched = new Set(S.watch.map((w) => w.url));
   let rows = S.catalog.filter((c) => {
     if (shop && c.shop !== shop) return false;
+    if (game && (c.game || 'pokemon') !== game) return false;
     if (av === 'buy' && !BUYABLE.has(c.availability)) return false;
     if (av && av !== 'buy' && c.availability !== av) return false;
     const n = norm(c.name);
@@ -552,16 +554,22 @@ function renderMarket() {
       <td>${watched.has(c.url) ? '<span class="muted">hlídáš</span>' : `<button class="btn btn-sm" data-watch="${esc(c.url)}">Hlídat</button>`}</td>
     </tr>`).join('') : `<tr><td colspan="7" class="empty">Nic nenalezeno. Zkus kratší dotaz, třeba jen název setu.</td></tr>`;
 }
-['#m-search', '#m-avail', '#m-shop', '#m-sort'].forEach((s) => $(s).addEventListener('input', renderMarket));
+['#m-search', '#m-avail', '#m-shop', '#m-game', '#m-sort'].forEach((s) => $(s).addEventListener('input', renderMarket));
 $('#market-table').addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-watch]');
   if (b && (await addWatch(b.dataset.watch, null, b))) renderMarket();
 });
 
 // ---------- edice (sety, ceny karet z PokeData) ----------
-const SETS = { data: null, lang: 'EN', open: null, loading: null };
+const SETS = { data: null, game: 'pokemon', lang: 'EN', open: null, loading: null };
 const czk = (usd) => (usd == null || !SETS.data?.usdCzk ? null : usd * SETS.data.usdCzk);
 const kc = (usd) => price(czk(usd));
+// Cyberpunk TCG: ceny z Cardmarketu v EUR
+const eurRate = () => SETS.data?.cp?.eurCzk || null;
+const kcE = (eur) => price(eur == null || !eurRate() ? null : eur * eurRate());
+const cpSets = () => SETS.data?.cp?.sets || [];
+// cena karty: normální, a když se prodává jen foil (Iconic karty Cyberpunku), tak foil
+const cardPrice = (c) => c?.raw ?? c?.foil ?? null;
 
 // Cena jednoho balíčku: nejlevnější cesta (samotný booster, box, bundle, ETB).
 function packCost(s) {
@@ -585,6 +593,13 @@ async function loadSets() {
 }
 
 function renderSetFilters() {
+  // Cyberpunk nemá jazyky, série ani ceny balíčků pro chase index
+  const cp = SETS.game === 'cyberpunk';
+  $('#s-lang').hidden = cp;
+  $('#s-series').hidden = cp;
+  $$('#s-sort option[value="index"], #s-sort option[value="pack"]').forEach((o) => (o.hidden = o.disabled = cp));
+  if (cp && ['index', 'pack'].includes($('#s-sort').value)) $('#s-sort').value = 'chase';
+  if (cp || !SETS.data) return;
   const sel = $('#s-series');
   const cur = sel.value;
   const series = [...new Set(SETS.data.sets.filter((s) => s.language === SETS.lang).map((s) => s.series).filter(Boolean))];
@@ -594,6 +609,7 @@ function renderSetFilters() {
 
 function renderSets() {
   if (!SETS.data) return;
+  if (SETS.game === 'cyberpunk') { renderCpSets(); return; }
   const q = norm($('#s-search').value);
   const series = $('#s-series').value, sort = $('#s-sort').value;
   const all = SETS.data.sets.filter((s) => s.language === SETS.lang);
@@ -629,11 +645,53 @@ function renderSets() {
   }).join('') || `<p class="empty">Žádná edice neodpovídá filtru.</p>`;
 }
 
+function renderCpSets() {
+  const q = norm($('#s-search').value), sort = $('#s-sort').value, cp = SETS.data.cp;
+  const all = cpSets();
+  const rows = all.filter((s) => !q || norm(s.name).includes(q));
+  const key = { top10: (s) => s.top10 ?? -1, value: (s) => s.setValue ?? -1, new: (s) => s.releaseDate || '' }[sort] || ((s) => cardPrice(s.chase) ?? -1);
+  rows.sort((a, b) => (sort === 'new' ? key(b).localeCompare(key(a)) : key(b) - key(a)));
+  $('#s-meta').textContent = cp
+    ? `${rows.length} edic Cyberpunk TCG · ceny z Cardmarketu (trh EU)${cp.priceGuideAt ? ` ze dne ${fmtDate(cp.priceGuideAt.slice(0, 10))}` : ''} přepočtené kurzem ČNB ${cp.eurCzk.toLocaleString('cs-CZ')} Kč/€` +
+      (cp.images ? '' : ' · obrázky karet z oficiálního webu teď nejdou načíst')
+    : 'Cyberpunk TCG se ještě načítá, zkus to za chvilku.';
+  $('#set-grid').innerHTML = rows.map((s) => `
+    <button class="set-tile cp" data-set="${s.id}">
+      <div class="logo-wrap">
+        <span class="logo-text">${esc(s.name)}</span>
+        ${s.chase?.img ? `<img class="chase-img" src="${safeUrl(s.chase.img)}" alt="" loading="lazy">` : ''}
+      </div>
+      <div class="body">
+        <h3>${esc(s.name)}</h3>
+        <span class="meta">Cyberpunk TCG${s.releaseDate ? ` · na Cardmarketu od ${fmtDate(s.releaseDate)}` : ''}${s.cardCount ? ` · ${s.cardCount} karet` : ''}</span>
+        ${s.chase ? `<span class="chase">Nejdražší: <b>${esc(s.chase.name)}</b> <span class="num">${kcE(cardPrice(s.chase))}</span></span>` : '<span class="chase">Zatím jen zapečetěné produkty</span>'}
+        <div class="kpis">
+          <div class="kpi"><span>Top 10 karet</span><b>${s.top10 ? kcE(s.top10) : '—'}</b></div>
+          <div class="kpi"><span>Box</span><b>${kcE(s.boxUsd)}</b></div>
+          <div class="kpi"><span>${s.deckUsd ? 'Deck' : 'Balíček'}</span><b>${kcE(s.deckUsd ?? s.packUsd)}</b></div>
+        </div>
+      </div>
+    </button>`).join('') || `<p class="empty">${all.length ? 'Žádná edice neodpovídá filtru.' : 'Cyberpunk TCG se ještě načítá.'}</p>`;
+}
+
+function setGame(game) {
+  SETS.game = game;
+  $$('#s-game button').forEach((b) => b.classList.toggle('on', b.dataset.game === game));
+  renderSetFilters();
+  renderSets();
+}
+
 $('#sets-list').addEventListener('click', (e) => {
+  const g = e.target.closest('[data-game]');
+  if (g) {
+    setGame(g.dataset.game);
+    animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 });
+    return;
+  }
   const seg = e.target.closest('[data-lang]');
   if (seg) {
     SETS.lang = seg.dataset.lang;
-    $$('#sets-list .seg button').forEach((b) => b.classList.toggle('on', b === seg));
+    $$('#s-lang button').forEach((b) => b.classList.toggle('on', b === seg));
     renderSetFilters(); renderSets();
     animateIn($$('#set-grid .set-tile').slice(0, 16), { stagger: 0.03 });
     return;
@@ -678,7 +736,10 @@ async function openSet(id, { push = true } = {}) {
   try {
     const d = await api(`sets?id=${id}`);
     SETS.open = d;
-    renderSetDetail(d);
+    // zpět na seznam pak ukáže edice stejné hry
+    if ((d.game || 'pokemon') !== SETS.game) setGame(d.game || 'pokemon');
+    if (d.game === 'cyberpunk') renderCpSetDetail(d);
+    else renderSetDetail(d);
   } catch (e) {
     box.innerHTML = `<div class="panel"><button class="btn btn-sm back" data-back>← Všechny edice</button><p class="empty">${esc(e.message)}. Ceny této edice se načtou během dne.</p></div>`;
   }
@@ -770,6 +831,71 @@ function renderSetDetail(d) {
   animateIn($$('#set-detail .set-hero, #set-detail .stat, #set-detail .panel, #set-detail .pcard').slice(0, 30), { stagger: 0.02 });
 }
 
+function renderCpSetDetail(d) {
+  const offers = (S?.catalog || []).filter((c) => c.game === 'cyberpunk')
+    .sort((a, b) => (BUYABLE.has(b.availability) - BUYABLE.has(a.availability)) || (a.price ?? 1e9) - (b.price ?? 1e9));
+  const sub = (c) => [c.num && `#${esc(c.num)}`, c.rarity && esc(c.rarity), c.raw != null && c.foil ? `foil: ${kcE(c.foil)}` : c.raw == null && c.foil ? 'cena foil' : '']
+    .filter(Boolean).join(' · ');
+  const stat = (v, label, energy) => `<div class="stat" style="--energy:var(--${energy})"><b class="num">${v}</b><span>${label}</span></div>`;
+  $('#set-detail').innerHTML = `
+    <div class="set-hero cp">
+      <div>
+        <button class="btn btn-sm back" data-back>← Všechny edice</button>
+        <h1>${esc(d.name)}</h1>
+        <div class="meta">Cyberpunk TCG${d.releaseDate ? ` · na Cardmarketu od ${fmtDate(d.releaseDate)}` : ''} · ${d.cardCount} karet · ceny ${ago(d.fetchedAt)}</div>
+      </div>
+    </div>
+
+    <div class="set-kpis">
+      ${stat(kcE(cardPrice(d.top[0])), 'nejdražší karta', 'accent')}
+      ${stat(kcE(d.top10 || null), 'top 10 karet', 'accent')}
+      ${stat(kcE(d.setValue || null), 'celý set (všechny karty)', 'psychic')}
+      ${stat(kcE(d.boxUsd), 'booster box', 'water')}
+      ${stat(kcE(d.deckUsd ?? d.packUsd), d.deckUsd ? 'starter deck' : 'booster', 'water')}
+    </div>
+
+    ${d.top.length ? `
+    <div class="panel mt">
+      <div class="panel-head"><h2>Nejdražší karty</h2><span class="muted">cena normální karty, u karet jen ve foil cena foil</span></div>
+      <div class="card-gallery">
+        ${d.top.slice(0, 24).map((c, n) => collectCard(d, c, { rank: n + 1, rate: eurRate(), sub: sub(c) })).join('')}
+      </div>
+    </div>` : ''}
+
+    ${d.cards.length ? `
+    <div class="panel mt" id="sd-all">
+      <div class="panel-head"><h2>Všechny karty edice</h2><span class="muted">${d.cardCount}</span></div>
+      <p class="panel-note">Projdi celou edici a naklikej karty, které máš. Přidají se rovnou do sbírky v profilu.</p>
+      <button class="btn btn-primary" data-sd-all>Zobrazit všechny karty</button>
+    </div>` : ''}
+
+    <div class="grid-2 mt">
+      <div class="panel">
+        <div class="panel-head"><h2>Zapečetěné produkty na Cardmarketu</h2></div>
+        <div class="table-wrap">
+          <table class="table compact prod-table">
+            <thead><tr><th>Produkt</th><th class="num">Cardmarket</th><th class="num">Sbírka</th></tr></thead>
+            <tbody>
+              ${d.products.map((p) => `<tr><td class="name"><span>${esc(p.name)}</span></td><td class="num">${kcE(p.usd)}</td><td class="num">${prodCollect(d, p)}</td></tr>`).join('')
+                || '<tr><td colspan="3" class="empty">Cardmarket pro tuhle edici nemá zapečetěné produkty s cenou.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <p class="hint">Trend prodejů na Cardmarketu (EU, v EUR) přepočtený kurzem ČNB ${eurRate()?.toLocaleString('cs-CZ') || ''} Kč/€.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Cyberpunk TCG v českých obchodech</h2><span class="muted">${offers.length}</span></div>
+        <ul class="sell-list">
+          ${offers.slice(0, 14).map((o) => `
+            <li>${img(o.image)}<div>${ext(o.url, esc(o.name))}<span class="meta">${esc(o.shop)} · ${AVAIL[o.availability]}</span></div><span class="num mono">${price(o.price)}</span></li>`).join('')
+            || '<li class="empty">Skenované obchody Cyberpunk TCG zatím nemají. Jakmile ho některý přidá, ohlásí se jako nový produkt.</li>'}
+        </ul>
+      </div>
+    </div>`;
+  renderOwned();
+  animateIn($$('#set-detail .set-hero, #set-detail .stat, #set-detail .panel, #set-detail .pcard').slice(0, 30), { stagger: 0.02 });
+}
+
 // „+ Do sbírky“ u zapečetěného produktu v tabulce edice
 function prodCollect(d, p) {
   if (p.id == null) return '';
@@ -782,7 +908,7 @@ $('#set-detail').addEventListener('click', async (e) => {
   if (all) {
     // detail ve staré verzi nemá všechny karty: dočte je endpoint sbírky (a uloží novou verzi)
     const box = $('#sd-all');
-    const d = SETS.open?.cards ? { ...SETS.open, usdCzk: SETS.data?.usdCzk } : await busy(all, () => api(`portfolio?set=${SETS.open.id}`));
+    const d = SETS.open?.cards ? { ...SETS.open, rate: SETS.open.cur === 'EUR' ? eurRate() : SETS.data?.usdCzk } : await busy(all, () => api(`portfolio?set=${SETS.open.id}`));
     if (!d) return;
     $('[data-sd-all]', box).remove();
     const holder = document.createElement('div');
@@ -799,7 +925,13 @@ $('#set-detail').addEventListener('click', async (e) => {
 // PokeData dává jen aktuální ceny, historii skládá server po dnech (pricehist) od přidání položky.
 const PF = { data: null, days: 30, pick: null, queue: Promise.resolve(), inflight: 0 };
 const GRADE = { raw: 'raw', psa9: 'PSA 9', psa10: 'PSA 10' };
-const pfKc = (usd) => (usd == null || !PF.data?.usdCzk ? null : usd * PF.data.usdCzk);
+const CP_GRADE = { raw: 'normální', foil: 'foil' }; // Cyberpunk TCG: Cardmarket má cenu normální a foil karty
+const gradesOf = (it) => (it.game === 'cyberpunk' ? CP_GRADE : GRADE);
+// cena položky v Kč: Pokémon v USD (PokeData), Cyberpunk v EUR (Cardmarket)
+const pfKc = (v, it) => {
+  const rate = it?.cur === 'EUR' ? PF.data?.eurCzk : PF.data?.usdCzk;
+  return v == null || !rate ? null : v * rate;
+};
 const dayAgo = (n) => new Date(Date.now() - n * DAY).toISOString().slice(0, 10);
 const plural = (n, one, few, many) => `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
 const signed = (v) => (v == null ? '—' : `${v > 0.5 ? '+' : v < -0.5 ? '−' : ''}${price(Math.abs(v))}`);
@@ -831,7 +963,7 @@ function enrichPf() {
   for (const it of PF.data.items) {
     it.pts = pricePoints(it);
     it.now = it.usd ?? it.pts.at(-1)?.[1] ?? null;
-    it.valueKc = it.now == null ? null : pfKc(it.now) * it.qty;
+    it.valueKc = it.now == null ? null : pfKc(it.now, it) * it.qty;
     const w = priceOn(it.pts, dayAgo(7));
     it.d7 = it.now == null || w == null ? null : (it.now - w) * it.qty;
     it.w7 = w == null ? null : w * it.qty;
@@ -845,8 +977,8 @@ function changeSince(days) {
   for (const it of PF.data.items) {
     if (it.now == null) continue;
     const then = priceOn(it.pts, dayAgo(days));
-    diff += pfKc(it.now - then) * it.qty;
-    base += pfKc(then) * it.qty;
+    diff += pfKc(it.now - then, it) * it.qty;
+    base += pfKc(then, it) * it.qty;
   }
   return { diff, base };
 }
@@ -862,7 +994,7 @@ function pfSeries(days) {
   const out = [];
   for (let t = Date.parse(start + 'T00:00:00Z'); t <= Date.now(); t += DAY) {
     const d = new Date(t).toISOString().slice(0, 10);
-    out.push([d, items.reduce((s, i) => s + pfKc(priceOn(i.pts, d)) * i.qty, 0)]);
+    out.push([d, items.reduce((s, i) => s + pfKc(priceOn(i.pts, d), i) * i.qty, 0)]);
   }
   return out;
 }
@@ -1085,9 +1217,9 @@ function renderPfTable() {
     <tr data-id="${esc(it.id)}">
       <td>${img(it.img, it.kind === 'card' ? 'thumb pf-thumb' : 'thumb', it.name)}</td>
       <td class="name"><b>${esc(it.name)}</b>
-        <div class="meta">${esc(it.setName)}${it.num ? ` · #${esc(it.num)}` : ''} · ${it.kind === 'card' ? GRADE[it.grade] : 'zapečetěné'}</div></td>
+        <div class="meta">${esc(it.setName)}${it.num ? ` · #${esc(it.num)}` : ''} · ${it.kind === 'card' ? gradesOf(it)[it.grade] || it.grade : 'zapečetěné'}</div></td>
       <td class="num">${it.qty}</td>
-      <td class="num hide-sm">${price(pfKc(it.now))}</td>
+      <td class="num hide-sm">${price(pfKc(it.now, it))}</td>
       <td class="num">${price(it.valueKc)}<div class="meta show-sm">${chg(it.d7, it.w7)}</div></td>
       <td class="num hide-sm">${chg(it.d7, it.w7)}</td>
       <td class="num hide-sm">${it.profitKc == null ? '<span class="muted">—</span>' : `${chg(it.profitKc, it.costKc)}<div class="meta">${signed(it.profitKc)}</div>`}</td>
@@ -1112,7 +1244,7 @@ $('#pf-table').addEventListener('click', (e) => {
     <tr class="pf-edit"><td colspan="8">
       <form class="pf-edit-form">
         <label class="field"><span>Kusů</span><input name="qty" type="number" min="0" step="1" value="${it.qty}" required></label>
-        ${it.kind === 'card' ? `<label class="field"><span>Stav karty</span><select name="grade">${Object.entries(GRADE).map(([k, l]) => `<option value="${k}" ${k === it.grade ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+        ${it.kind === 'card' ? `<label class="field"><span>Stav karty</span><select name="grade">${Object.entries(gradesOf(it)).map(([k, l]) => `<option value="${k}" ${k === it.grade ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
         <label class="field"><span>Nákupní cena za kus (Kč)</span><input name="buyPrice" type="number" min="0" step="1" value="${it.buyPrice ?? ''}" placeholder="nepovinné"></label>
         <button class="btn btn-primary" type="submit">Uložit</button>
         <button class="btn btn-danger" type="button" data-remove>Odebrat ze sbírky</button>
@@ -1168,14 +1300,14 @@ $('#pk-close').addEventListener('click', () => { $('#pf-picker').hidden = true; 
 function renderPickSets() {
   const q = norm($('#pk-set-search').value);
   const mine = new Set(PF.data.items.map((i) => i.setId));
-  const list = (SETS.data?.sets || [])
+  const list = [...(SETS.data?.sets || []), ...cpSets()]
     .filter((s) => !q || norm(s.name).includes(q) || norm(s.code).includes(q))
     .sort((a, b) => (mine.has(b.id) - mine.has(a.id)) || b.releaseDate.localeCompare(a.releaseDate))
     .slice(0, q ? 30 : 12);
   $('#pk-set-list').innerHTML = list.map((s) => `
     <button class="pk-set-btn" data-pick="${s.id}">
       ${s.logo ? `<img src="${safeUrl(s.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
-      <span><b>${esc(s.name)}</b><small>${s.language === 'JP' ? 'japonská' : 'anglická'} · ${fmtDate(s.releaseDate)}${mine.has(s.id) ? ' · máš z ní' : ''}</small></span>
+      <span><b>${esc(s.name)}</b><small>${s.game === 'cyberpunk' ? 'Cyberpunk TCG' : s.language === 'JP' ? 'japonská' : 'anglická'} · ${fmtDate(s.releaseDate)}${mine.has(s.id) ? ' · máš z ní' : ''}</small></span>
     </button>`).join('') || `<p class="empty">Žádná edice neodpovídá. Zkus anglický název nebo kód setu.</p>`;
 }
 $('#pk-set-search').addEventListener('input', renderPickSets);
@@ -1223,7 +1355,12 @@ $('#pk-set').addEventListener('click', (e) => {
 // počty kusů se pak překreslí všude najednou (renderOwned).
 const REFS = new Map();
 function regRef(kind, set, r, usd) {
-  REFS.set(`${kind}:${r.id}`, { kind, refId: r.id, setId: set.id, setName: set.name, fetchedAt: set.fetchedAt || null, name: r.name, num: r.num || null, img: r.img || null, usd: usd ?? null });
+  // karta Cyberpunku, která se prodává jen ve foil, se přidá rovnou jako foil (jinak by neměla cenu)
+  const grade = kind !== 'card' ? null : r.raw == null && r.foil != null ? 'foil' : 'raw';
+  REFS.set(`${kind}:${r.id}`, {
+    kind, refId: r.id, setId: set.id, setName: set.name, fetchedAt: set.fetchedAt || null, name: r.name, num: r.num || null, img: r.img || null,
+    usd: (grade === 'foil' ? r.foil : usd) ?? null, grade, cur: set.cur || 'USD', game: set.game || null,
+  });
 }
 const collectBtns = (kind, id, name) => `
   <span class="pk-qty"></span>
@@ -1235,10 +1372,10 @@ function collectCard(set, c, { rank = null, sub = '', rate = null } = {}) {
   if (can) regRef('card', set, c, c.raw);
   return `
     <div class="pcard" ${can ? `data-own="card:${c.id}"` : ''}>
-      <div class="img">${rank ? `<span class="rank">#${rank}</span>` : ''}${c.img ? `<img src="${safeUrl(c.img)}" alt="${esc(c.name)}" loading="lazy" referrerpolicy="no-referrer">` : ''}
+      <div class="img">${rank ? `<span class="rank">#${rank}</span>` : ''}${c.img ? `<img src="${safeUrl(c.img)}" alt="${esc(c.name)}" loading="lazy" referrerpolicy="no-referrer" data-zoom>` : ''}
         ${can ? `<button class="pc-add" data-collect="add" data-kind="card" data-ref="${c.id}" aria-label="Přidat ${esc(c.name)} do sbírky">+</button>` : ''}</div>
       <b>${esc(c.name)}</b>
-      <div class="price-row"><span class="num mono">${c.raw == null || !rate ? '—' : price(c.raw * rate)}</span>${can ? collectBtns('card', c.id, c.name) : ''}</div>
+      <div class="price-row"><span class="num mono">${cardPrice(c) == null || !rate ? '—' : price(cardPrice(c) * rate)}</span>${can ? collectBtns('card', c.id, c.name) : ''}</div>
       ${sub ? `<small>${sub}</small>` : ''}
     </div>`;
 }
@@ -1247,14 +1384,17 @@ function collectCard(set, c, { rank = null, sub = '', rate = null } = {}) {
 function cardBrowser(box, d, { back = false, done = false } = {}) {
   for (const c of d.cards) regRef('card', d, c, c.raw);
   for (const p of d.products) if (p.id != null) regRef('product', d, p, p.usd);
-  const kc2 = (usd) => price(usd == null || !d.usdCzk ? null : usd * d.usdCzk);
+  const rate = d.rate ?? d.usdCzk; // Kč za měnu edice (USD u Pokémonů, EUR u Cyberpunku)
+  const kc2 = (v) => price(v == null || !rate ? null : v * rate);
   box.innerHTML = `
     <div class="pk-tools">
       ${back ? '<button class="btn btn-sm" data-pk-back>← Jiná edice</button>' : ''}
       <input class="cb-filter" type="search" placeholder="Filtrovat podle jména nebo čísla" aria-label="Filtrovat karty">
       <label class="check"><input type="checkbox" class="cb-mine"> Jen co mám</label>
     </div>
-    <p class="hint">Klik na kartu přidá jeden kus (raw). Stav (PSA 9 / PSA 10), počet a nákupní cenu upravíš pak v tabulce sbírky v profilu.</p>
+    <p class="hint">${d.game === 'cyberpunk'
+      ? 'Klik na kartu přidá jeden kus (normální, u karet jen ve foil rovnou foil). Normální / foil, počet a nákupní cenu upravíš pak v tabulce sbírky v profilu.'
+      : 'Klik na kartu přidá jeden kus (raw). Stav (PSA 9 / PSA 10), počet a nákupní cenu upravíš pak v tabulce sbírky v profilu.'}</p>
     <div class="pk-grid"></div>
     ${d.products.length ? '<h3 class="sub">Zapečetěné produkty</h3><ul class="pk-prods"></ul>' : ''}
     ${done ? '<div class="pk-foot"><button class="btn" data-pk-done>Hotovo</button></div>' : ''}`;
@@ -1263,11 +1403,12 @@ function cardBrowser(box, d, { back = false, done = false } = {}) {
     const ok = (name, num, kind, id) => (!q || norm(name).includes(q) || String(num ?? '') === q) && (!mineOnly || ownedQty(kind, id));
     $('.pk-grid', box).innerHTML = d.cards.filter((c) => ok(c.name, c.num, 'card', c.id)).map((c) => `
       <div class="pk-card" data-own="card:${c.id}">
-        <button class="pk-art" data-collect="add" data-kind="card" data-ref="${c.id}" aria-label="Přidat ${esc(c.name)} #${esc(c.num)}">
+        <button class="pk-art" data-collect="add" data-kind="card" data-ref="${c.id}" aria-label="Přidat ${esc(c.name)}${c.num ? ` #${esc(c.num)}` : ''}">
           ${c.img ? `<img src="${safeUrl(c.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<span class="pk-qty"></span>
         </button>
+        ${c.img ? `<button class="pk-zoom" data-zoom="${safeUrl(c.img)}" data-name="${esc(c.name)}" aria-label="Zvětšit ${esc(c.name)}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5M11 8v6M8 11h6"/></svg></button>` : ''}
         <b title="${esc(c.name)}">${esc(c.name)}</b>
-        <div class="pk-row"><small>#${esc(c.num)}</small><span class="num">${kc2(c.raw)}</span>
+        <div class="pk-row"><small>${c.num ? `#${esc(c.num)}` : ''}</small><span class="num">${kc2(cardPrice(c))}</span>
           <button class="pk-minus" data-collect="minus" data-kind="card" data-ref="${c.id}" aria-label="Odebrat jeden kus ${esc(c.name)}" hidden>−</button></div>
       </div>`).join('') || '<p class="empty">Žádná karta neodpovídá filtru.</p>';
     const prods = $('.pk-prods', box);
@@ -1286,6 +1427,66 @@ function cardBrowser(box, d, { back = false, done = false } = {}) {
   $('.cb-mine', box).addEventListener('change', draw);
   draw();
 }
+
+// ---------- zvětšení karty ----------
+// Klik na obrázek karty (Přehled, Edice, sbírka) nebo na lupu ve výběru karet ji ukáže přes celou obrazovku.
+// Zachytává se už ve fázi capture, aby klik na obrázek nespustil zároveň úpravu řádku sbírky.
+// Karta se naklání v prostoru za kurzorem (na mobilu za prstem) a po povrchu jí jede lesk.
+let zoomFrom = null, zoomTilt = null;
+const zoomCard = $('#zoom .zoom-card');
+function tiltZoom(x, y, on) {
+  if (!motion()) return;
+  zoomTilt ||= { rx: gsap.quickTo(zoomCard, 'rotationX', { duration: 0.6, ease: 'power3' }), ry: gsap.quickTo(zoomCard, 'rotationY', { duration: 0.6, ease: 'power3' }) };
+  zoomTilt.rx(-y * 14);
+  zoomTilt.ry(x * 18);
+  zoomCard.style.setProperty('--gx', `${50 + x * 45}%`);
+  zoomCard.style.setProperty('--gy', `${50 + y * 45}%`);
+  zoomCard.classList.toggle('lit', on);
+}
+$('#zoom').addEventListener('pointermove', (e) => {
+  const r = zoomCard.getBoundingClientRect();
+  const c = (v) => Math.max(-1, Math.min(1, v));
+  tiltZoom(c((e.clientX - r.left - r.width / 2) / (r.width / 2)), c((e.clientY - r.top - r.height / 2) / (r.height / 2)), true);
+});
+$('#zoom').addEventListener('pointerleave', () => tiltZoom(0, 0, false));
+function openZoom(src, name, from) {
+  const z = $('#zoom'), im = $('img', z);
+  zoomFrom = from;
+  im.src = src;
+  im.alt = name || '';
+  $('figcaption', z).textContent = name || '';
+  z.hidden = false;
+  $('.zoom-close', z).focus({ preventScroll: true });
+  if (motion()) {
+    gsap.set(zoomCard, { transformPerspective: 1100 });
+    gsap.fromTo(z, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 });
+    // přiletí natočená a srovná se
+    gsap.fromTo(zoomCard, { scale: 0.7, y: 30, rotationY: -35, rotationX: 10 }, { scale: 1, y: 0, rotationY: 0, rotationX: 0, duration: 0.7, ease: 'back.out(1.4)' });
+  }
+}
+function closeZoom() {
+  const z = $('#zoom');
+  if (z.hidden) return;
+  const done = () => {
+    z.hidden = true;
+    $('img', z).removeAttribute('src');
+    zoomCard.classList.remove('lit');
+    if (window.gsap) gsap.set(zoomCard, { rotationX: 0, rotationY: 0 });
+    zoomFrom?.focus?.({ preventScroll: true });
+    zoomFrom = null;
+  };
+  if (motion()) gsap.to(z, { autoAlpha: 0, duration: 0.18, onComplete: () => { done(); gsap.set(z, { clearProps: 'opacity,visibility' }); } });
+  else done();
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('img[data-zoom], button[data-zoom], #pf-table img.pf-thumb');
+  if (!t) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openZoom(t.dataset.zoom || t.currentSrc || t.src, t.dataset.name || t.alt, t);
+}, true);
+$('#zoom').addEventListener('click', closeZoom);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeZoom(); });
 
 // počty kusů všude, kde se karta nebo produkt ukazuje (mřížky se nepřekreslují, aby neposkakovaly)
 function renderOwned() {
@@ -1309,16 +1510,16 @@ document.addEventListener('click', (e) => {
   if (!ref) return;
   const items = PF.data.items;
   if (b.dataset.collect === 'add') {
-    const id = kind === 'card' ? `c:${refId}:raw` : `p:${refId}`;
+    const id = kind === 'card' ? `c:${refId}:${ref.grade}` : `p:${refId}`;
     const it = items.find((i) => i.id === id);
     if (it) it.qty++;
-    else items.push({ id, kind, refId, grade: kind === 'card' ? 'raw' : null, qty: 1, setId: ref.setId, setName: ref.setName, name: ref.name, num: ref.num, img: ref.img, buyPrice: null, addedAt: new Date().toISOString(), addedUsd: ref.usd, usd: ref.usd, pricedAt: ref.fetchedAt, hist: [] });
-    pfSave({ action: 'add', kind, setId: ref.setId, refId });
+    else items.push({ id, kind, refId, grade: ref.grade, qty: 1, setId: ref.setId, setName: ref.setName, name: ref.name, num: ref.num, img: ref.img, buyPrice: null, addedAt: new Date().toISOString(), addedUsd: ref.usd, usd: ref.usd, cur: ref.cur, ...(ref.game ? { game: ref.game } : {}), pricedAt: ref.fetchedAt, hist: [] });
+    pfSave({ action: 'add', kind, setId: ref.setId, refId, grade: ref.grade });
     // mimo výběr v profilu potvrdit, že se to opravdu uložilo do sbírky
     if (!b.closest('#pf-picker')) toast(`Ve sbírce: ${ref.name} (${ownedQty(kind, refId)} ks)`);
   } else {
     // ubírá se nejdřív raw kus, pak ostatní stavy
-    const it = items.find((i) => i.id === `c:${refId}:raw`) || items.find((i) => i.kind === kind && i.refId === refId);
+    const it = items.find((i) => i.id === `c:${refId}:${ref.grade}`) || items.find((i) => i.kind === kind && i.refId === refId);
     if (!it) return;
     it.qty--;
     if (it.qty <= 0) PF.data.items = items.filter((i) => i !== it);
@@ -1373,14 +1574,14 @@ $('#release-form').addEventListener('submit', async (e) => {
 
 // ---------- novinky ----------
 function renderNews() {
-  const only = $('#n-announce').checked, cz = $('#n-cz').checked;
-  const items = S.news.filter((n) => (!only || n.announce) && (!cz || n.lang === 'cs'));
-  $('#n-meta').textContent = `PokeGuardian · Google News EN · Google News CZ · načteno ${ago(S.newsLastScan)}`;
+  const only = $('#n-announce').checked, cz = $('#n-cz').checked, game = $('#n-game').value;
+  const items = S.news.filter((n) => (!only || n.announce) && (!cz || n.lang === 'cs') && (!game || (n.game || 'pokemon') === game));
+  $('#n-meta').textContent = `PokeGuardian · Google News EN · Google News CZ · Cyberpunk TCG z Google News · načteno ${ago(S.newsLastScan)}`;
   $('#news').innerHTML = items.length ? items.map((n) => `
     <a class="news-card" href="${safeUrl(n.url)}" target="_blank" rel="noopener">
       ${n.image ? img(n.image, '', n.title) : ''}
       <div>
-        <span class="src">${n.announce && n.lang !== 'cs' ? '<span class="tag t-news">ohlášení</span> · ' : ''}${n.lang === 'cs' ? 'CZ · ' : ''}${esc(n.source)}</span>
+        <span class="src">${n.announce && n.lang !== 'cs' ? '<span class="tag t-news">ohlášení</span> · ' : ''}${n.game === 'cyberpunk' ? 'Cyberpunk TCG · ' : ''}${n.lang === 'cs' ? 'CZ · ' : ''}${esc(n.source)}</span>
         <b>${esc(n.title)}</b>
         ${n.excerpt ? `<span class="meta">${esc(n.excerpt)}</span>` : ''}
         <span class="meta">${ago(n.published || n.firstSeen)}</span>
@@ -1389,6 +1590,7 @@ function renderNews() {
 }
 $('#n-announce').addEventListener('change', renderNews);
 $('#n-cz').addEventListener('change', renderNews);
+$('#n-game').addEventListener('input', renderNews);
 
 // ---------- účet (Nastavení) ----------
 async function loadAccount() {
@@ -1554,8 +1756,8 @@ function searchItems(q) {
   const words = norm(q).split(/\s+/).filter(Boolean);
   if (!words.length) return [];
   const match = (name) => { const n = norm(name); return words.every((w) => n.includes(w) || (w === 'etb' && n.includes('elite trainer'))); };
-  const sets = (SETS.data?.sets || []).filter((s) => match(s.name) || norm(s.code) === norm(q)).slice(0, 4).map((s) => ({
-    img: s.logo, cls: 'logo', label: s.name, meta: `edice · ${s.language === 'JP' ? 'japonská' : 'anglická'} · ${fmtDate(s.releaseDate)}`,
+  const sets = [...(SETS.data?.sets || []), ...cpSets()].filter((s) => match(s.name) || (s.code && norm(s.code) === norm(q))).slice(0, 4).map((s) => ({
+    img: s.logo, cls: 'logo', label: s.name, meta: `edice · ${s.game === 'cyberpunk' ? 'Cyberpunk TCG' : s.language === 'JP' ? 'japonská' : 'anglická'} · ${fmtDate(s.releaseDate)}`,
     go: () => openSet(s.id),
   }));
   const prods = (S?.groups || []).filter((g) => match(g.name))

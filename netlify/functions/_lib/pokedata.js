@@ -20,18 +20,22 @@ const MAX_AGE_H = 24;
 
 const stat = (c, src) => c.stats?.find((s) => s.source === src)?.avg ?? null;
 
-export async function usdCzk() {
-  // denní kurz ČNB, cache na 12 h
-  const cached = await getJson('fx/usd');
+// denní kurz ČNB (Kč za 1 USD / 1 EUR), cache na 12 h
+async function cnbRate(code, fallback) {
+  const key = `fx/${code.toLowerCase()}`;
+  const cached = await getJson(key);
   if (cached && Date.now() - new Date(cached.at) < 12 * 3600e3) return cached.rate;
   try {
     const { text } = await fetchText('https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt');
-    const m = text.match(/\|USD\|([\d,]+)/);
-    const rate = m ? parseFloat(m[1].replace(',', '.')) : null;
-    if (rate) { await setJson('fx/usd', { rate, at: new Date().toISOString() }); return rate; }
+    // řádek „USA|dolar|1|USD|20,895“: kurz je poslední sloupec
+    const line = text.split('\n').find((l) => l.includes(`|${code}|`));
+    const rate = line ? parseFloat(line.trim().split('|').pop().replace(',', '.')) : null;
+    if (rate) { await setJson(key, { rate, at: new Date().toISOString() }); return rate; }
   } catch {}
-  return cached?.rate || 22;
+  return cached?.rate || fallback;
 }
+export const usdCzk = () => cnbRate('USD', 22);
+export const eurCzk = () => cnbRate('EUR', 25);
 
 async function fetchSetList() {
   const all = await fetchJson(`${BASE}/sets`, { headers: HEADERS, timeoutMs: 20000 });
@@ -128,7 +132,7 @@ const BASE_FIELDS = ['id', 'name', 'code', 'language', 'series', 'releaseDate', 
 // Detail edice pro sbírku: když je uložený ve staré verzi (bez všech karet), načte ho hned.
 export async function loadSetDetail(id) {
   const cur = await getJson(`set/${id}`);
-  if (cur?.v === PARSE_VERSION) return cur;
+  if (cur?.v === PARSE_VERSION || cur?.game === 'cyberpunk') return cur; // Cyberpunk edice obnovuje cron-cyberpunk
   const idx = await getJson('sets/summary', { sets: [] });
   const s = idx.sets.find((x) => x.id === id);
   if (!s) return null;
