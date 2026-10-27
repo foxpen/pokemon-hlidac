@@ -1,7 +1,7 @@
 // GET — všechno pro dashboard jedním dotazem (data jsou malá, stovky položek).
 import { endpoint, json } from './_lib/http-response.js';
 import { getJson, listJson, getSettings } from './_lib/store.js';
-import { SHOPS } from './_lib/shops.js';
+import { SHOPS, gameOf } from './_lib/shops.js';
 import { configured } from './_lib/notify.js';
 import { getOfficial } from './_lib/official.js';
 
@@ -38,7 +38,7 @@ export default endpoint(async () => {
         url: x.url, name: x.name, price: x.price, availability: x.availability,
         image: x.image, releaseDate: x.releaseDate || null, stockNote: x.stockNote || null,
         soldOutAt: x.soldOutAt || null, restockedAt: x.restockedAt || null,
-        firstSeen: x.firstSeen, checkedAt: x.checkedAt, shop: s.name, shopId: s.id,
+        firstSeen: x.firstSeen, checkedAt: x.checkedAt, shop: s.name, shopId: s.id, game: gameOf(x.name),
       });
     }
   });

@@ -143,6 +143,13 @@ async function scanShop(shop, settings, deadline) {
       const { text } = await fetchText(url);
       for (const l of extractProductLinks(text, url, shop)) if (!links.has(l.url)) links.set(l.url, l.title);
     }
+    // stránky jen kvůli Cyberpunk TCG: chyba tady nesmí shodit sken Pokémonů
+    for (const url of shop.cpScan || []) {
+      try {
+        const { text } = await fetchText(url);
+        for (const l of extractProductLinks(text, url, { ...shop, productRe: /^$/ })) if (!links.has(l.url)) links.set(l.url, l.title);
+      } catch {}
+    }
     if (!links.size) throw new Error('kategorie nevrátila žádné produkty (změnil se web?)');
     for (const [url, title] of links) {
       if (st.seen[url] || st.queue.some((q) => q.url === url)) continue;

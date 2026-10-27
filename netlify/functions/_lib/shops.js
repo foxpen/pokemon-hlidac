@@ -1,6 +1,8 @@
 // Konfigurace českých obchodů.
 //   scan     — stránky kategorie, kde se hledají NOVÉ produkty (nejlépe řazené od nejnovějších)
 //   productRe — které odkazy z kategorie jsou kandidáti na produkt (cesta URL)
+//   cpRe     — odkazy na Cyberpunk TCG ve stejných stránkách (typicky společný předprodej všech her)
+//   cpScan   — stránky navíc jen kvůli Cyberpunku (procházejí se jen odkazy podle cpRe)
 // Obchody bez `scan` jdou jen hlídat přes watchlist (vložíš konkrétní URL produktu) —
 // jejich výpis kategorií se renderuje JavaScriptem nebo blokuje roboty.
 import { fetchJson } from './http.js';
@@ -19,6 +21,7 @@ export const SHOPS = [
     // předprodej je společný pro všechny hry (Magic, fotbal…) → v odkazu musí být „pokemon“
     scan: ['https://www.vesely-drak.cz/produkty/pokemon-karty/', 'https://www.vesely-drak.cz/produkty/predprodej/'],
     productRe: /^\/produkty\/[^/]+\/\d+-[^/]*pokemon[^/]*\/$/,
+    cpRe: /^\/produkty\/[^/]+\/\d+-[^/]*cyberpunk[^/]*\/$/,
   },
   {
     id: 'sparkys',
@@ -33,6 +36,8 @@ export const SHOPS = [
     host: 'tlamagames.com',
     scan: ['https://www.tlamagames.com/pokemon/?order=-date', 'https://www.tlamagames.com/predprodej/'],
     productRe: /^\/[^/]+\/pokemon[^/]*\/$/,
+    cpScan: ['https://www.tlamagames.com/cyberpunk-hry/'],
+    cpRe: /^\/[^/]+\/[^/]*cyberpunk[^/]*\/$/,
   },
   {
     id: 'imago',
@@ -61,6 +66,7 @@ export const SHOPS = [
     host: 'planetaher.cz',
     scan: ['https://www.planetaher.cz/pokemon/?order=-date', 'https://www.planetaher.cz/predprodej/'],
     productRe: /^\/[^/]*pokemon[^/]*\/$/,
+    cpRe: /^\/[^/]*cyberpunk[^/]*\/$/,
   },
   {
     id: 'tcgshop',
@@ -86,6 +92,14 @@ export const SHOPS = [
 // Kategorie a stránky, které productRe sice chytí, ale nejsou to TCG produkty.
 const SKIP = /blog|clanek|navod|gdpr|kategorie|vyrobce|znacka|lego|plys|figurk|burza|alba-pokemon|krabicky|podlozky|kusov|^\/(boostery[a-z-]*|booster-box[a-z-]*|elite-trainer-boxy|specialni-sety|blistery|alba|japonske-booster-boxy)\/$/i;
 
+// Cyberpunk TCG, ne deskovka, RPG nebo puzzle (ty obchody vedou pod stejným jménem).
+const CP_TCG = /tcg|trading-card|karetni|booster|starter-deck|demo-deck|welcome-to-night-city|alpha-kit|pre-?release/i;
+const CP_NOT = /gang|deskov|board-game|combat-zone|rpg|puzzle|kniha|book|insert|poskozen/i;
+const isCpLink = (shop, path) => !!shop.cpRe?.test(path) && CP_TCG.test(path) && !CP_NOT.test(path);
+
+// Hra podle názvu produktu (katalog, filtr v Trhu a nabídky u edic).
+export const gameOf = (name) => (/cyberpunk/i.test(name || '') ? 'cyberpunk' : 'pokemon');
+
 export function shopForUrl(url) {
   let host;
   try { host = new URL(url).hostname.replace(/^www\.|^m\./, ''); } catch { return null; }
@@ -103,7 +117,7 @@ export function extractProductLinks(html, pageUrl, shop) {
     if (!u.hostname.endsWith(shop.host)) continue;
     let path;
     try { path = decodeURIComponent(u.pathname); } catch { path = u.pathname; }
-    if (!shop.productRe.test(path) || SKIP.test(path)) continue;
+    if (!(shop.productRe.test(path) || isCpLink(shop, path)) || SKIP.test(path)) continue;
     const clean = `${u.origin}${u.pathname}`;
     const title = m[2].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     if (!out.has(clean) || (title && !out.get(clean))) out.set(clean, title);

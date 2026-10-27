@@ -28,6 +28,7 @@
   --lightning: #f2c230; /* nový produkt */
   --psychic: #b386ee;   /* novinka */
   --colorless: #9aa0ab; /* nedostupné */
+  --cyber: #4fe3f0;     /* Cyberpunk TCG (druhá barva vedle žluté) */
   --danger: #ef5b5b;
 
   /* trenérská karta */
@@ -50,6 +51,7 @@
   --z-pop: 30;
   --z-toast: 50;
   --z-intro: 60;
+  --z-zoom: 55;
   color-scheme: dark;
 }
 
@@ -697,6 +699,21 @@ body.locked { overflow: hidden; }
 .idx.mid { --energy: var(--lightning); }
 .idx.lo { --energy: var(--fire); }
 .set-tile.pending { opacity: .55; }
+/* Cyberpunk TCG: edice nemají loga, název je v „terminálovém“ stylu na šikmých pruzích */
+.set-tile.cp .logo-wrap {
+  background: repeating-linear-gradient(-45deg, rgba(242, 194, 48, .05) 0 10px, transparent 10px 20px),
+    radial-gradient(120% 90% at 20% 10%, color-mix(in srgb, var(--cyber) 14%, transparent), transparent 60%), rgba(0, 0, 0, .35);
+}
+.set-tile.cp .logo-text {
+  font: 700 14px/1.25 var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--accent);
+  text-shadow: 2px 0 0 color-mix(in srgb, var(--cyber) 45%, transparent);
+}
+.set-tile.cp:hover { border-color: color-mix(in srgb, var(--cyber) 55%, transparent); }
+.set-hero.cp {
+  border-left: 3px solid var(--accent);
+  background: repeating-linear-gradient(-45deg, rgba(242, 194, 48, .04) 0 12px, transparent 12px 24px),
+    linear-gradient(90deg, rgba(7, 8, 11, .96) 30%, color-mix(in srgb, var(--cyber) 10%, rgba(7, 8, 11, .85)));
+}
 
 /* detail edice */
 .set-hero {
@@ -719,7 +736,7 @@ body.locked { overflow: hidden; }
 .pcard { position: relative; text-decoration: none; display: flex; flex-direction: column; gap: 6px; }
 .pcard .img { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 63 / 88; background: var(--panel-hover); box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .9); transition: transform .3s var(--ease); }
 .pcard .img img { width: 100%; height: 100%; object-fit: cover; }
-.pcard .img::after { content: ''; position: absolute; inset: 0; opacity: 0; mix-blend-mode: color-dodge; transition: opacity .3s; background: linear-gradient(115deg, transparent 25%, rgba(255, 120, 200, .35) 40%, rgba(120, 220, 255, .35) 52%, rgba(150, 255, 170, .3) 64%, transparent 78%); }
+.pcard .img::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: color-dodge; transition: opacity .3s; background: linear-gradient(115deg, transparent 25%, rgba(255, 120, 200, .35) 40%, rgba(120, 220, 255, .35) 52%, rgba(150, 255, 170, .3) 64%, transparent 78%); }
 .pcard:hover .img { transform: translateY(-4px) rotate(-1deg) scale(1.03); }
 .pcard:hover .img::after { opacity: .8; }
 .pcard .rank { position: absolute; left: 8px; top: 8px; z-index: 1; font: 700 11px var(--mono); padding: 2px 7px; border-radius: 999px; background: rgba(7, 8, 11, .85); color: var(--accent); }
@@ -850,7 +867,44 @@ section[data-view="profile"] .panel-head { flex-wrap: wrap; }
 .pk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 16px 14px; }
 .pk-sk { aspect-ratio: 63 / 88; border-radius: 7px; }
 .pk-grid > .empty { grid-column: 1 / -1; }
-.pk-card { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pk-card { position: relative; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pk-zoom {
+  position: absolute; left: 6px; top: 6px; width: 28px; height: 28px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 50%; background: rgba(0, 0, 0, .65); color: var(--text); cursor: zoom-in;
+  opacity: 0; transition: opacity .2s var(--ease), transform .2s var(--ease);
+}
+.pk-card:hover .pk-zoom, .pk-zoom:focus-visible { opacity: 1; }
+.pk-zoom:hover { transform: scale(1.1); }
+@media (hover: none) { .pk-zoom { opacity: .9; } }
+
+/* zvětšená karta */
+img[data-zoom], #pf-table img.pf-thumb { cursor: zoom-in; }
+.zoom {
+  position: fixed; inset: 0; z-index: var(--z-zoom); display: grid; place-items: center; padding: 24px;
+  background: rgba(4, 5, 8, .84); backdrop-filter: blur(6px); cursor: zoom-out;
+}
+.zoom[hidden] { display: none; }
+.zoom figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.zoom-card { position: relative; border-radius: 16px; transform-style: preserve-3d; will-change: transform; touch-action: none; }
+.zoom img {
+  display: block; height: min(80vh, 760px); max-width: calc(100vw - 48px); aspect-ratio: 63 / 88; object-fit: contain;
+  border-radius: 16px; box-shadow: 0 30px 80px -24px #000, 0 0 0 1px rgba(255, 255, 255, .08);
+}
+/* lesk pod kurzorem + duhový holo pruh, oba se posouvají s náklonem (--gx/--gy z JS) */
+.zoom-glare, .zoom-card::after { position: absolute; inset: 0; border-radius: 16px; pointer-events: none; opacity: 0; transition: opacity .35s var(--ease); }
+.zoom-glare { background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, .42), rgba(255, 255, 255, .08) 32%, transparent 60%); mix-blend-mode: soft-light; }
+.zoom-card::after {
+  content: ''; mix-blend-mode: color-dodge; background-size: 250% 250%; background-position: var(--gx, 50%) var(--gy, 50%);
+  background-image: linear-gradient(115deg, transparent 30%, rgba(255, 120, 200, .28) 42%, rgba(120, 220, 255, .28) 50%, rgba(150, 255, 170, .24) 58%, transparent 70%);
+}
+.zoom-card.lit .zoom-glare { opacity: 1; }
+.zoom-card.lit::after { opacity: .8; }
+.zoom figcaption { max-width: 90vw; font-weight: 600; text-align: center; color: var(--text); }
+.zoom-close {
+  position: absolute; top: 14px; right: 14px; width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--glass-solid); color: var(--text); font: 400 24px/1 var(--font);
+}
+.zoom-close:hover { border-color: var(--accent); }
 .pk-art {
   position: relative; display: block; width: 100%; padding: 0; border: 0; cursor: pointer; overflow: hidden;
   aspect-ratio: 63 / 88; border-radius: 7px; background: var(--panel-hover);

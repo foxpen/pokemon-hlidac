@@ -1,10 +1,12 @@
-// Sbírka (portfolio): karty a zapečetěné produkty, které mám. Ceny bere z uložených edic (PokeData).
+// Sbírka (portfolio): karty a zapečetěné produkty, které mám. Ceny bere z uložených edic
+// (PokeData v USD, Cyberpunk TCG z Cardmarketu v EUR — měna je u edice v `cur`).
 // PokeData dává jen aktuální průměr, žádnou historii — tu si skládáme sami:
 //   portfolio            — položky sbírky a profil (píše jen uživatel)
 //   pricehist/<setId>    — denní ceny vlastněných položek té edice (píše jen cron-sets po obnově edice)
 import { getJson, setJson } from './store.js';
 
-export const GRADES = ['raw', 'psa9', 'psa10'];
+// foil jen u Cyberpunk TCG (Cardmarket má zvlášť cenu normální a foil karty), PSA jen u Pokémonů
+export const GRADES = ['raw', 'psa9', 'psa10', 'foil'];
 const HIST_DAYS = 400;
 
 // Stejná karta v jiném stavu (raw / PSA 10) je jiná položka, protože má jinou cenu.

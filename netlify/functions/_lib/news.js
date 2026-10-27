@@ -58,6 +58,8 @@ export const NEWS_SOURCES = [
   { id: 'pokeguardian', fn: pokeGuardian },
   { id: 'gnews-en', fn: () => googleNews('"Pokémon TCG" when:7d', 'en', 'Google News') },
   { id: 'gnews-cz', fn: () => googleNews('pokémon karty when:14d', 'cs', 'CZ') },
+  // Cyberpunk TCG (nová hra, zpráv je málo → delší okno)
+  { id: 'gnews-cp', game: 'cyberpunk', fn: () => googleNews('"Cyberpunk TCG" OR "Cyberpunk trading card game" when:30d', 'en', 'Google News') },
 ];
 
 export async function fetchAllNews() {
@@ -65,7 +67,7 @@ export async function fetchAllNews() {
   const items = [];
   const errors = {};
   results.forEach((r, i) => {
-    if (r.status === 'fulfilled') items.push(...r.value);
+    if (r.status === 'fulfilled') items.push(...r.value.map((it) => ({ ...it, game: NEWS_SOURCES[i].game || 'pokemon' })));
     else errors[NEWS_SOURCES[i].id] = r.reason?.message || String(r.reason);
   });
   for (const it of items) it.announce = ANNOUNCE_RE.test(it.title) || it.lang === 'cs';

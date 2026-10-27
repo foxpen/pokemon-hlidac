@@ -2,7 +2,7 @@
 // POST {action: add|update|remove|profile, ...} — úpravy sbírky a profilu.
 import { endpoint, json } from './_lib/http-response.js';
 import { getJson, setJson } from './_lib/store.js';
-import { loadSetDetail, usdCzk } from './_lib/pokedata.js';
+import { loadSetDetail, usdCzk, eurCzk } from './_lib/pokedata.js';
 import { GRADES, itemId, findRef, refUsd, getPortfolio } from './_lib/portfolio.js';
 
 const MAX_QTY = 9999;
@@ -17,9 +17,9 @@ async function view(port) {
   })));
   const items = port.items.map((it) => {
     const { d, h } = sets.get(it.setId);
-    return { ...it, usd: refUsd(d, it), pricedAt: d?.fetchedAt || null, hist: h[it.id] || [] };
+    return { ...it, usd: refUsd(d, it), cur: d?.cur || 'USD', pricedAt: d?.fetchedAt || null, hist: h[it.id] || [] };
   });
-  return { items, profile: port.profile, usdCzk: await usdCzk() };
+  return { items, profile: port.profile, usdCzk: await usdCzk(), eurCzk: await eurCzk() };
 }
 
 export default endpoint(async (req) => {
@@ -29,8 +29,8 @@ export default endpoint(async (req) => {
       const d = await loadSetDetail(setId);
       if (!d?.cards) return json({ error: 'Edici se nepodařilo načíst' }, 404);
       return json({
-        id: d.id, name: d.name, language: d.language, logo: d.logo, releaseDate: d.releaseDate, fetchedAt: d.fetchedAt,
-        cards: d.cards, products: d.products, usdCzk: await usdCzk(),
+        id: d.id, game: d.game || 'pokemon', cur: d.cur || 'USD', name: d.name, language: d.language, logo: d.logo, releaseDate: d.releaseDate, fetchedAt: d.fetchedAt,
+        cards: d.cards, products: d.products, usdCzk: await usdCzk(), rate: d.cur === 'EUR' ? await eurCzk() : await usdCzk(),
       });
     }
     return json(await view(await getPortfolio()));
@@ -54,7 +54,7 @@ export default endpoint(async (req) => {
     else {
       port.items.push({
         id, kind, setId, refId, grade, name: ref.name, num: ref.num || null, img: ref.img || null,
-        setName: d.name, language: d.language, qty, buyPrice: money(body.buyPrice),
+        setName: d.name, language: d.language, ...(d.game ? { game: d.game } : {}), qty, buyPrice: money(body.buyPrice),
         addedAt: new Date().toISOString(), addedUsd: refUsd(d, { kind, refId, grade }),
       });
     }

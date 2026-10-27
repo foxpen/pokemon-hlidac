@@ -303,7 +303,7 @@
               <tbody></tbody>
             </table>
           </div>
-          <p class="hint">Ceny jsou z PokeData (americký trh), přepočtené denním kurzem ČNB. Nákupní cenu zadávej za kus v Kč. Historie cen se ukládá jednou denně od chvíle, kdy kartu přidáš.</p>
+          <p class="hint">Ceny Pokémonů jsou z PokeData (americký trh), Cyberpunk TCG z Cardmarketu (EU), obojí přepočtené denním kurzem ČNB. Nákupní cenu zadávej za kus v Kč. Historie cen se ukládá jednou denně od chvíle, kdy kartu přidáš.</p>
         </div>
       </section>
 
@@ -319,6 +319,11 @@
             <option value="out_of_stock">Jen vyprodané</option>
           </select>
           <select id="m-shop" aria-label="Obchod"><option value="">Všechny obchody</option></select>
+          <select id="m-game" aria-label="Hra">
+            <option value="">Všechny hry</option>
+            <option value="pokemon">Pokémon</option>
+            <option value="cyberpunk">Cyberpunk TCG</option>
+          </select>
           <select id="m-sort" aria-label="Řazení">
             <option value="new">Nejnověji přidané</option>
             <option value="price">Nejlevnější</option>
@@ -338,7 +343,11 @@
       <section data-view="sets" hidden>
         <div id="sets-list">
           <div class="panel filters">
-            <div class="seg" role="group" aria-label="Jazyk edic">
+            <div class="seg" role="group" aria-label="Hra" id="s-game">
+              <button data-game="pokemon" class="on">Pokémon</button>
+              <button data-game="cyberpunk">Cyberpunk</button>
+            </div>
+            <div class="seg" role="group" aria-label="Jazyk edic" id="s-lang">
               <button data-lang="EN" class="on">Anglické</button>
               <button data-lang="JP">Japonské</button>
             </div>
@@ -388,6 +397,11 @@
         <div class="panel filters">
           <label class="check"><input type="checkbox" id="n-announce"> Jen ohlášení produktů a setů</label>
           <label class="check"><input type="checkbox" id="n-cz"> Jen české zprávy</label>
+          <select id="n-game" aria-label="Hra">
+            <option value="">Všechny hry</option>
+            <option value="pokemon">Pokémon</option>
+            <option value="cyberpunk">Cyberpunk TCG</option>
+          </select>
           <span class="muted" id="n-meta"></span>
         </div>
         <div class="news-grid" id="news"></div>
@@ -474,6 +488,12 @@
     <button class="nav-btn" data-view="calendar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Kalendář</span></button>
     <button class="nav-btn" data-view="news"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v10a2 2 0 0 1-2 2M8 9h5M8 13h5M8 17h3"/></svg><span>Novinky</span></button>
     <button class="nav-btn" data-view="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Nastavení</span></button>
+  </div>
+
+  <!-- zvětšená karta (klik na obrázek karty) -->
+  <div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="Detail karty" hidden>
+    <figure><div class="zoom-card"><img alt=""><span class="zoom-glare"></span></div><figcaption></figcaption></figure>
+    <button class="zoom-close" type="button" aria-label="Zavřít">×</button>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
